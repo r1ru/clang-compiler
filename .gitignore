@@ -3,5 +3,5 @@
 !*.*
 !Makefile
 *.o
-*.md
 tmp*
+a.out
