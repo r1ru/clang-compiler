@@ -7,6 +7,7 @@
 #define STREAM stdout
 #define ERROR stderr
 
+/* 字句解析用 */
 typedef enum{
     TK_RESERVED,
     TK_NUM,
@@ -22,7 +23,25 @@ struct Token{
     char* str;
 };
 
-Token *token; /* 構文解析、意味解析に使う。 */
+/* 構文解析用*/
+Token *token;
+
+typedef enum{
+    ND_ADD,
+    ND_SUB,
+    ND_MUL,
+    ND_DIV,
+    ND_NUM,
+}NodeKind;
+
+typedef struct Node Node;
+
+struct Node{
+    NodeKind kind;
+    Node *lhs; /* left hand side */
+    Node *rhs; /* right hand side */
+    int val; /* ND_NUM用 */ 
+};
 
 /* error表示用の関数 */
 char* input;
@@ -100,8 +119,8 @@ Token* tokenize(void){
             continue;
         }
 
-        /* '+'か'-'だった場合 */
-        if(*p == '+' || *p == '-'){
+        /* 予約記号の場合 */
+        if(*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')'){
             cur = new_token(TK_RESERVED, cur, p);
             p++;
             //display(cur);
@@ -136,7 +155,7 @@ void expect(char op){
     token = token -> next;
 }
 
-/* TK_NUM用。次のトークンが数値の時に数値を返す。それ以外の時エラー */
+/* TK_NUM用。トークンが数値の時に数値を返す。それ以外の時エラー */
 int expect_number(void){
     if( token -> kind != TK_NUM)
         error_at(token->str, "数ではありません\n");
@@ -148,6 +167,106 @@ int expect_number(void){
 /* TK_EOF用。トークンがEOFかどうかを返す。*/
 bool at_eof(){
     return token -> kind == TK_EOF;
+}
+
+/* 新しいnodeを作成 */
+Node* new_node(NodeKind kind, Node* lhs, Node* rhs){
+    Node* np = calloc(1, sizeof(Node));
+    np -> kind = kind;
+    np -> lhs = lhs;
+    np -> rhs = rhs;
+    return np;
+}
+
+/* ND_NUMを作成 */
+Node* new_node_num(int val){
+    Node *np = calloc(1, sizeof(Node));
+    np -> kind = ND_NUM;
+    np -> val = val;
+    return np;
+}
+
+Node* expr(void);
+Node* mul(void);
+Node* primary(void);
+
+/* expr = mul ("+" mul | "-" mul)* */
+Node *expr(void){
+    Node* np = mul();
+    /* "+" mul か "-" mulを消費する */
+    for(;;){
+        if(consume('+'))
+            np = new_node(ND_ADD, np, mul());
+        else if(consume('-'))
+            np = new_node(ND_SUB, np, mul());
+        else 
+            return np;
+    }
+}
+
+/* mul = primary ("*" primary | "/" primary)* */
+Node* mul(void){
+    Node* np = primary();
+    /* "*" primary か "/" primaryを消費する */
+    for(;;){
+        if(consume('*'))
+            np = new_node(ND_MUL, np, primary());
+        else if(consume('/'))
+            np = new_node(ND_DIV, np, primary());
+        else 
+            return np;
+    }
+}
+
+/* primary = num | (expr) */
+Node* primary(void){
+    /* '('ならexprを呼ぶ */
+    if(consume('(')){
+        Node* np = expr();
+        expect(')');
+        return np;
+    }
+    /* そうでなければ数値のはず */
+    return new_node_num(expect_number());
+}
+
+/* コードを生成 */
+void gen(Node* np){
+
+    /* ND_KINDなら入力が一つの数値だったということ。*/
+    if(np -> kind == ND_NUM){
+        fprintf(STREAM, "\tpush %d\n", np -> val);
+        return;
+    }
+
+    /* 左辺と右辺を計算 */
+    gen(np -> lhs);
+    gen(np -> rhs);
+
+    fprintf(STREAM, "\tpop rdi\n"); //rhs
+    fprintf(STREAM, "\tpop rax\n"); //lhs
+
+    switch( np -> kind){
+
+        case ND_ADD:
+            fprintf(STREAM, "\tadd rax, rdi\n");
+            break;
+        
+        case ND_SUB:
+            fprintf(STREAM, "\tsub rax, rdi\n");
+            break;
+
+        case ND_MUL:
+            fprintf(STREAM, "\timul rax, rdi\n");
+            break;
+
+        case ND_DIV:
+            fprintf(STREAM, "\tcqo\n");
+            fprintf(STREAM, "\tidiv rdi\n");
+            break;
+    }
+
+    fprintf(STREAM, "\tpush rax\n");
 }
 
 int main(int argc, char* argv[]){
@@ -162,27 +281,19 @@ int main(int argc, char* argv[]){
     /* tokenize */
     token = tokenize();
 
+    /* 構文解析 */
+    Node *np  = expr();
+
      /* アセンブリの前半を出力 */
     fprintf(STREAM, ".intel_syntax noprefix\n");
     fprintf(STREAM, ".global main\n");
     fprintf(STREAM, "main:\n");
 
-    /* 式の最初は数値でなければならない　*/
-    fprintf(STREAM, "\tmov rax, %d\n", expect_number());
+    /* コード生成 */
+    gen(np);
 
-    /* EOFまで消費する */
-    while(!at_eof()){
-        
-        if(consume('+')){
-            fprintf(STREAM, "\tadd rax, %d\n", expect_number());
-            continue;
-        }
-
-        /* +で無ければ-が来るはず。*/
-        expect('-');
-        fprintf(STREAM, "\tsub rax, %d\n", expect_number());
-    }
-
+    /* 結果をpop */
+    fprintf(STREAM, "\tpop rax\n");
     fprintf(STREAM, "\tret\n");
     
     return 0;
