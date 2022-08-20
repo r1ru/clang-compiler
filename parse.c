@@ -44,17 +44,17 @@ static Token* new_token(TokenKind kind, Token* cur, char* str, int len){
 static void display_token(Token *tp){
 
     if(tp -> kind == TK_NUM){
-        fprintf(STREAM, "TK_NUM, val: %d, len: %d\n", tp -> val, tp -> len);
+        fprintf(STREAM, "TK_NUM, val: %d\n", tp -> val);
         return;
     }
 
     if(tp -> kind == TK_IDENT){
-        fprintf(STREAM, "TK_IDENT, ident: %c\n", tp -> str[0]);
+        fprintf(STREAM, "TK_IDENT, ident: %.*s\n", tp -> len , tp -> str);
         return;
     }
 
     if(tp -> kind == TK_RESERVED){
-        fprintf(STREAM, "TK_RESERVED, str: %s, len: %d\n", tp -> str, tp -> len);
+        fprintf(STREAM, "TK_RESERVED, str: %.*s\n", tp -> len, tp -> str);
         return;
     }
 
@@ -69,10 +69,15 @@ static bool startswith(char* p1, char* p2){
     return memcmp(p1, p2, strlen(p2)) == 0;
 }
 
+static bool ischar(char c){
+    return 'a' <= c && c <= 'z';
+}
+
 /* 入力文字列をトークナイズしてそれを返す */
 void tokenize(void){
     Token head; /* これは無駄になるがスタック領域なのでオーバーヘッドは0に等しい */
     Token* cur = &head;
+    char *q;
 
     char *p = input;
 
@@ -87,7 +92,7 @@ void tokenize(void){
         /* 数値だった場合 */
         if(isdigit(*p)){
             cur = new_token(TK_NUM, cur, p, 0);
-            char* q = p;
+            q = p;
             cur -> val = strtol(p, &p, 10);
             cur -> len = p - q; /* 長さを記録 */
             //display_token(cur);
@@ -111,12 +116,16 @@ void tokenize(void){
             p++;
             continue;
         }
-
-        /* 識別子の場合。(現時点では小文字1文字のみ) */
-        if('a' <= *p && *p <= 'z') {
-            cur = new_token(TK_IDENT, cur, p, 1);
+        
+        if(ischar(*p)){
+            cur = new_token(TK_IDENT, cur, p, 0);
+            q = p;
+            while(ischar(*p)){
+                p++;
+            }
+            cur -> len = p - q; /* 長さを記録 */
             //display_token(cur);
-            p++;
+            
             continue;
         }
 
@@ -133,6 +142,31 @@ void tokenize(void){
 }
 
 /* 構文解析と意味解析用 */
+
+typedef struct LVar LVar;
+
+/* ローカル変数の型 */
+struct LVar {
+  LVar *next; // 次の変数かNULL
+  char *name; // 変数の名前
+  int len;    // 名前の長さ
+  int offset; // RBPからのオフセット
+};
+
+/* ローカル変数の単方向リスト */
+static LVar *locals;
+
+/* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */
+static LVar *find_lvar(Token *tp) {
+  for (LVar *lvar = locals; lvar; lvar = lvar->next){
+    /* memcmpは一致したら0を返す。startswithを使ってもいいかも? */
+    if (lvar -> len == tp -> len && !memcmp(lvar -> name, tp -> str, lvar -> len)){
+         return lvar;   
+    }
+  }
+  return NULL;
+}
+
 /* TK_RESERVED用。トークンが期待した記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
 static bool consume(char* op){
     if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
@@ -141,15 +175,14 @@ static bool consume(char* op){
     return true;
 }
 
-/* TK_IDENT用。トークンが識別子のときはトークンを読み進めて返す。識別子を第一引数に書き込む。それ以外のときは偽を返す。*/
-static bool consume_ident(char* ip){
+/* TK_IDENT用。トークンが識別子のときはトークンを読み進めてTK_IDENTへのポインタを返す。それ以外のときはNULLを返す。*/
+static Token* consume_ident(void){
     if(token -> kind != TK_IDENT) {
-       return false;
+       return NULL;
     }
-    char ident = token -> str[0];
-    *ip = ident;
+    Token* tp = token;
     token = token -> next;
-    return true;
+    return tp;
 }
 
 /* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
@@ -159,9 +192,9 @@ static void expect(char* op){
     token = token -> next;
 }
 
-/* TK_NUM用。トークンが数値の時に数値を返す。それ以外の時エラー */
+/* TK_NUM用。トークンが数値の時にトークンを読み進めて数値を返す。それ以外の時エラー */
 static int expect_number(void){
-    if( token -> kind != TK_NUM)
+    if(token -> kind != TK_NUM)
         error_at(token->str, "数ではありません\n");
     int val = token -> val;
     token = token -> next;
@@ -190,11 +223,30 @@ static Node* new_node_num(int val){
     return np;
 }
 
-/* ND_IDENTを作成 */
-static Node* new_node_ident(int offset){
-    Node *np = calloc(1, sizeof(Node));
+/* ND_LVARを作成 */
+static Node* new_node_lvar(Token* tp){
+    Node *np;
+    LVar* lvar;
+
+    np = calloc(1, sizeof(Node));
     np -> kind = ND_LVAR;
-    np ->offset = offset;
+
+     /* ローカル変数が既に登録されているか検索 */
+    lvar = find_lvar(tp);
+    /* されているならoffsetはそれを使用 */
+    if(lvar){
+        np -> offset = lvar -> offset; 
+    }
+    /* されていなければリストに登録 */
+    else{
+        lvar = calloc(1, sizeof(LVar));
+        lvar -> next = locals;
+        lvar -> name = tp -> str;
+        lvar -> len = tp -> len;
+        lvar -> offset = locals -> offset + 8; 
+        np -> offset = lvar -> offset;
+        locals = lvar;
+    }
     return np;
 }
 
@@ -212,6 +264,8 @@ static Node* primary(void);
 /* program = stmt* */
 void program(void){
     int i = 0;
+    locals = calloc(1, sizeof(LVar)); /* これをしないとnew_node_lvarのlocals->nextでSegmentation Faultがでる。
+                                        定義のみだとlocalsはNULLなので。*/
     while(!at_eof()){
         code[i] = stmt();
         i++;
@@ -313,19 +367,22 @@ static Node* unary(void){
 /* primary = num | ident | "(" expr ")" */
 static Node* primary(void){
     Node* np;
-    char ident;
+    Token* tp;
+
     /* "("ならexprを呼ぶ */
     if(consume("(")){
         np = expr();
         expect(")");
+        return np;
     }
-    else if(consume_ident(&ident)){
-        int offset = (ident - 'a' + 1) * 8; /* rbpのアドレスにはsaved rbpがあるので、+1している。 */
-        np = new_node_ident(offset);
+
+    /* 識別子トークンの場合 */
+    tp = consume_ident();
+    if(tp){
+        np = new_node_lvar(tp);
+        return np;
     }
-    else{
-        /* そうでなければ数値のはず */
-        np = new_node_num(expect_number());
-    }
-    return np;
+
+    /* そうでなければ数値のはず */
+    return new_node_num(expect_number());
 }

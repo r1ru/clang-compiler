@@ -23,7 +23,7 @@ int main(int argc, char* argv[]){
     /* プロローグ。変数26個分の領域を確保する */
     fprintf(STREAM, "\tpush rbp\n");
     fprintf(STREAM, "\tmov rbp, rsp\n");
-    fprintf(STREAM, "\tsub rsp, 208\n"); /* 8 * 206 */
+    fprintf(STREAM, "\tsub rsp, 208\n"); /* 8 * 26 */
 
     /* 先頭の文からコード生成 */
     for( int i = 0; code[i]; i++){
