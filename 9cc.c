@@ -188,6 +188,7 @@ Node* new_node_num(int val){
 
 Node* expr(void);
 Node* mul(void);
+Node* unary(void);
 Node* primary(void);
 
 /* expr = mul ("+" mul | "-" mul)* */
@@ -204,17 +205,32 @@ Node *expr(void){
     }
 }
 
-/* mul = primary ("*" primary | "/" primary)* */
+/* mul = unary ("*" unary | "/" unary)* */
 Node* mul(void){
-    Node* np = primary();
-    /* "*" primary か "/" primaryを消費する */
+    Node* np = unary();
+    /* "*" unary か "/" unaryを消費する */
     for(;;){
         if(consume('*'))
-            np = new_node(ND_MUL, np, primary());
+            np = new_node(ND_MUL, np, unary());
         else if(consume('/'))
-            np = new_node(ND_DIV, np, primary());
+            np = new_node(ND_DIV, np, unary());
         else 
             return np;
+    }
+}
+
+/* unary = ('+' | '-')? primary */
+Node* unary(void){
+    /* +はそのまま */
+    if(consume('+')){
+        return primary();
+    }
+    /* -xは0 - xと解釈する。 */
+    else if(consume('-')){
+        return new_node(ND_SUB, new_node_num(0), primary());
+    }
+    else{
+        return primary();
     }
 }
 
