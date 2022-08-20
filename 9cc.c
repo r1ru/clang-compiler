@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
 #include <stdbool.h>
@@ -21,6 +22,7 @@ struct Token{
     Token* next;
     int val;
     char* str;
+    int len; /* トークンの長さ */
 };
 
 /* 構文解析用*/
@@ -32,6 +34,10 @@ typedef enum{
     ND_MUL,
     ND_DIV,
     ND_NUM,
+    ND_EQ, // ==
+    ND_NE, // !=
+    ND_LT, // < less than
+    ND_LE, // <= less than or equal to
 }NodeKind;
 
 typedef struct Node Node;
@@ -69,10 +75,11 @@ void error(char *fmt, ...) {
 /* 字句解析用 */
 
 /* 新しいtokenを作成してcurにつなげる。*/
-Token* new_token(TokenKind kind, Token* cur, char* str){
+Token* new_token(TokenKind kind, Token* cur, char* str, int len){
     Token* tp = calloc(1, sizeof(Token));
     tp -> kind = kind;
     tp -> str = str;
+    tp -> len = len;
     cur -> next = tp;
     return tp;
 }
@@ -81,12 +88,12 @@ Token* new_token(TokenKind kind, Token* cur, char* str){
 void display(Token *tp){
 
     if(tp -> kind == TK_NUM){
-        fprintf(STREAM, "TK_NUM, val: %d\n", tp -> val);
+        fprintf(STREAM, "TK_NUM, val: %d, len: %d\n", tp -> val, tp -> len);
         return;
     }
 
     if(tp -> kind == TK_RESERVED){
-        fprintf(STREAM, "TK_RESERVED, str: %c\n", tp -> str[0]);
+        fprintf(STREAM, "TK_RESERVED, str: %s, len: %d\n", tp -> str, tp -> len);
         return;
     }
 
@@ -94,6 +101,11 @@ void display(Token *tp){
         fprintf(STREAM, "TK_EOF\n");
         return;
     }
+}
+
+/* 文字列を比較。memcmpは成功すると0を返す。 */
+bool startswith(char* p1, char* p2){
+    return memcmp(p1, p2, strlen(p2)) == 0;
 }
 
 /* 入力文字列をトークナイズしてそれを返す */
@@ -113,17 +125,27 @@ Token* tokenize(void){
 
         /* 数値だった場合 */
         if(isdigit(*p)){
-            cur = new_token(TK_NUM, cur, p);
+            cur = new_token(TK_NUM, cur, p, 0);
+            char* q = p;
             cur -> val = strtol(p, &p, 10);
+            cur -> len = p - q; /* 長さを記録 */
             //display(cur);
             continue;
         }
 
         /* 予約記号の場合 */
-        if(*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')'){
-            cur = new_token(TK_RESERVED, cur, p);
+        /* 可変長operator。これを先に置かないと例えば<=が<と=という二つに解釈されてしまう。*/
+        if(startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=")) {
+            cur = new_token(TK_RESERVED, cur, p, 2);
+            p += 2;
+            continue;
+        }
+
+         /* 一文字operatorの場合。
+        strchrは第一引数で渡された検索対象から第二引数の文字を探してあればその文字へのポインターを、なければNULLを返す。*/
+        if(strchr("+-*/()<>", *p)){
+            cur = new_token(TK_RESERVED, cur, p, 1);
             p++;
-            //display(cur);
             continue;
         }
 
@@ -132,7 +154,7 @@ Token* tokenize(void){
     }
 
     /* 終了を表すトークンを作成 */
-    cur = new_token(TK_EOF, cur, p);
+    cur = new_token(TK_EOF, cur, p, 0);
     //display(cur);
     
     /* 先頭のトークンへのポインタを返す */
@@ -140,17 +162,17 @@ Token* tokenize(void){
 }
 
 /* 構文解析と意味解析用 */
-/* TK_RESERVED用。トークンが期待した記号(+か-)のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
-bool consume(char op){
-    if(token -> kind != TK_RESERVED || token -> str[0] != op)
+/* TK_RESERVED用。トークンが期待した記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
+bool consume(char* op){
+    if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
         return false;
     token = token -> next;
     return true;
 }
 
 /* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
-void expect(char op){
-    if(token -> kind != TK_RESERVED || token -> str[0] != op)
+void expect(char* op){
+    if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
         error_at(token->str, "%cではありません\n", op);
     token = token -> next;
 }
@@ -187,20 +209,57 @@ Node* new_node_num(int val){
 }
 
 Node* expr(void);
+Node* equality(void);
+Node * relational(void);
+Node* add(void);
 Node* mul(void);
 Node* unary(void);
 Node* primary(void);
 
-/* expr = mul ("+" mul | "-" mul)* */
-Node *expr(void){
-    Node* np = mul();
-    /* "+" mul か "-" mulを消費する */
+/* expr = equality */
+Node* expr(void){
+    return equality();
+}
+
+/* equality = relational ("==" relational | "!=" relational)* */
+Node* equality(void){
+    Node* np = relational();
     for(;;){
-        if(consume('+'))
-            np = new_node(ND_ADD, np, mul());
-        else if(consume('-'))
-            np = new_node(ND_SUB, np, mul());
+        if(consume("=="))
+            np = new_node(ND_EQ, np, relational());
+        else if(consume("!="))
+            np = new_node(ND_NE, np, relational());
         else 
+            return np;
+    }
+}
+
+/* relational = add ("<" add | "<=" add | ">" add | ">=" add)* */
+Node* relational(void){
+    Node* np = add();
+    for(;;){
+        if(consume("<"))
+            np = new_node(ND_LT, np, add());
+        else if(consume("<="))
+            np = new_node(ND_LE, np , add());
+        else if(consume(">"))
+            np = new_node(ND_LT, add(), np); /* x > y は y < xと同じ。 */
+        else if(consume(">="))
+            np = new_node(ND_LE, add(), np); /* x >= y は y <= xと同じ */
+        else 
+            return np;
+    }
+}
+
+/* add = mul ("+" mul | "-" mul)* */
+Node* add(void){
+    Node* np = mul();
+    for(;;){
+        if(consume("+"))
+            np = new_node(ND_ADD, np, mul());
+        else if(consume("-"))
+            np = new_node(ND_SUB, np, mul());
+        else
             return np;
     }
 }
@@ -208,25 +267,24 @@ Node *expr(void){
 /* mul = unary ("*" unary | "/" unary)* */
 Node* mul(void){
     Node* np = unary();
-    /* "*" unary か "/" unaryを消費する */
     for(;;){
-        if(consume('*'))
+        if(consume("*"))
             np = new_node(ND_MUL, np, unary());
-        else if(consume('/'))
+        else if(consume("/"))
             np = new_node(ND_DIV, np, unary());
         else 
             return np;
     }
 }
 
-/* unary = ('+' | '-')? primary */
+/* unary = ("+" | "-")? primary */
 Node* unary(void){
     /* +はそのまま */
-    if(consume('+')){
+    if(consume("+")){
         return primary();
     }
     /* -xは0 - xと解釈する。 */
-    else if(consume('-')){
+    else if(consume("-")){
         return new_node(ND_SUB, new_node_num(0), primary());
     }
     else{
@@ -236,10 +294,10 @@ Node* unary(void){
 
 /* primary = num | (expr) */
 Node* primary(void){
-    /* '('ならexprを呼ぶ */
-    if(consume('(')){
+    /* "("ならexprを呼ぶ */
+    if(consume("(")){
         Node* np = expr();
-        expect(')');
+        expect(")");
         return np;
     }
     /* そうでなければ数値のはず */
@@ -279,6 +337,30 @@ void gen(Node* np){
         case ND_DIV:
             fprintf(STREAM, "\tcqo\n");
             fprintf(STREAM, "\tidiv rdi\n");
+            break;
+
+        case ND_EQ:
+            fprintf(STREAM, "\tcmp rax, rdi\n");
+            fprintf(STREAM, "\tsete al\n"); /* rflagsから必要なフラグをコピー恐らくZF */
+            fprintf(STREAM, "\tmovzb rax, al\n"); /* 上位ビットを0埋め。(eaxへのmov以外、上位ビットは変更されない)*/
+            break;
+
+        case ND_NE:
+            fprintf(STREAM, "\tcmp rax, rdi\n");
+            fprintf(STREAM, "\tsetne al\n");
+            fprintf(STREAM, "\tmovzb rax, al\n");
+            break;
+
+        case ND_LT:
+            fprintf(STREAM, "\tcmp rax, rdi\n");
+            fprintf(STREAM, "\tsetl al\n");
+            fprintf(STREAM, "\tmovzb rax, al\n");
+            break;
+        
+        case ND_LE:
+            fprintf(STREAM, "\tcmp rax, rdi\n");
+            fprintf(STREAM, "\tsetle al\n");
+            fprintf(STREAM, "\tmovzb rax, al\n");
             break;
     }
 
