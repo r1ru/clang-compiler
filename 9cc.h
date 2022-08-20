@@ -16,6 +16,7 @@ typedef struct Token Token;
 /* 字句解析用 */
 typedef enum{
     TK_RESERVED,
+    TK_IDENT, /* 識別子 */
     TK_NUM,
     TK_EOF
 }TokenKind;
@@ -33,11 +34,13 @@ typedef enum{
     ND_SUB,
     ND_MUL,
     ND_DIV,
-    ND_NUM,
     ND_EQ, // ==
     ND_NE, // !=
     ND_LT, // < less than
     ND_LE, // <= less than or equal to
+    ND_ASSIGN, // =
+    ND_LVAR, // local variable
+    ND_NUM
 }NodeKind;
 
 typedef struct Node Node;
@@ -47,12 +50,15 @@ struct Node{
     Node *lhs; /* left hand side */
     Node *rhs; /* right hand side */
     int val; /* ND_NUM用 */ 
+    int offset; /* ND_LVAL用 */
 };
 
-extern Token* token;
 extern char* input;
-Token* tokenize(void);
-Node* expr(void);
+extern Node* code[100]; 
+
+void error(char *fmt, ...);
+void tokenize(void);
+void program(void);
 
 void gen(Node* np);
 

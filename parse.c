@@ -1,10 +1,12 @@
 #include "9cc.h"
 
 /* 構文解析用*/
-Token *token;
+static Token *token;
 
 /* error表示用の関数 */
 char* input;
+
+Node* code[100]; /* 文は最大で99まで */
 
 static void error_at(char *loc, char *fmt, ...) {
   va_list ap;
@@ -18,7 +20,7 @@ static void error_at(char *loc, char *fmt, ...) {
   exit(1);
 }
 
-static void error(char *fmt, ...) {
+void error(char *fmt, ...){
   va_list ap;
   va_start(ap, fmt);
   vfprintf(stderr, fmt, ap);
@@ -39,10 +41,15 @@ static Token* new_token(TokenKind kind, Token* cur, char* str, int len){
 }
 
 /* for dubug */
-static void display(Token *tp){
+static void display_token(Token *tp){
 
     if(tp -> kind == TK_NUM){
         fprintf(STREAM, "TK_NUM, val: %d, len: %d\n", tp -> val, tp -> len);
+        return;
+    }
+
+    if(tp -> kind == TK_IDENT){
+        fprintf(STREAM, "TK_IDENT, ident: %c\n", tp -> str[0]);
         return;
     }
 
@@ -63,7 +70,7 @@ static bool startswith(char* p1, char* p2){
 }
 
 /* 入力文字列をトークナイズしてそれを返す */
-Token* tokenize(void){
+void tokenize(void){
     Token head; /* これは無駄になるがスタック領域なのでオーバーヘッドは0に等しい */
     Token* cur = &head;
 
@@ -83,7 +90,7 @@ Token* tokenize(void){
             char* q = p;
             cur -> val = strtol(p, &p, 10);
             cur -> len = p - q; /* 長さを記録 */
-            //display(cur);
+            //display_token(cur);
             continue;
         }
 
@@ -91,14 +98,24 @@ Token* tokenize(void){
         /* 可変長operator。これを先に置かないと例えば<=が<と=という二つに解釈されてしまう。*/
         if(startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=")) {
             cur = new_token(TK_RESERVED, cur, p, 2);
+            //display_token(cur);
             p += 2;
             continue;
         }
 
          /* 一文字operatorの場合。
         strchrは第一引数で渡された検索対象から第二引数の文字を探してあればその文字へのポインターを、なければNULLを返す。*/
-        if(strchr("+-*/()<>", *p)){
+        if(strchr("+-*/()<>;=", *p)){
             cur = new_token(TK_RESERVED, cur, p, 1);
+            //display_token(cur);
+            p++;
+            continue;
+        }
+
+        /* 識別子の場合。(現時点では小文字1文字のみ) */
+        if('a' <= *p && *p <= 'z') {
+            cur = new_token(TK_IDENT, cur, p, 1);
+            //display_token(cur);
             p++;
             continue;
         }
@@ -109,10 +126,10 @@ Token* tokenize(void){
 
     /* 終了を表すトークンを作成 */
     cur = new_token(TK_EOF, cur, p, 0);
-    //display(cur);
+    //display_token(cur);
     
-    /* 先頭のトークンへのポインタを返す */
-    return head.next;
+    /* tokenの先頭をセット */
+    token = head.next;
 }
 
 /* 構文解析と意味解析用 */
@@ -124,10 +141,21 @@ static bool consume(char* op){
     return true;
 }
 
+/* TK_IDENT用。トークンが識別子のときはトークンを読み進めて返す。識別子を第一引数に書き込む。それ以外のときは偽を返す。*/
+static bool consume_ident(char* ip){
+    if(token -> kind != TK_IDENT) {
+       return false;
+    }
+    char ident = token -> str[0];
+    *ip = ident;
+    token = token -> next;
+    return true;
+}
+
 /* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
 static void expect(char* op){
     if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
-        error_at(token->str, "%cではありません\n", op);
+        error_at(token->str, "%sではありません\n", op);
     token = token -> next;
 }
 
@@ -162,7 +190,18 @@ static Node* new_node_num(int val){
     return np;
 }
 
-Node* expr(void);
+/* ND_IDENTを作成 */
+static Node* new_node_ident(int offset){
+    Node *np = calloc(1, sizeof(Node));
+    np -> kind = ND_LVAR;
+    np ->offset = offset;
+    return np;
+}
+
+void program(void);
+static Node* stmt(void);
+static Node* expr(void);
+static Node* assign(void);
 static Node* equality(void);
 static Node * relational(void);
 static Node* add(void);
@@ -170,9 +209,34 @@ static Node* mul(void);
 static Node* unary(void);
 static Node* primary(void);
 
-/* expr = equality */
-Node* expr(void){
-    return equality();
+/* program = stmt* */
+void program(void){
+    int i = 0;
+    while(!at_eof()){
+        code[i] = stmt();
+        i++;
+    }
+    code[i] = NULL; /* 終了をマーク */
+}
+
+/* stmt = expr ";" */
+static Node* stmt(void){
+    Node* np = expr();
+    expect(";");
+    return np;
+}
+
+/* expr = assign */
+static Node* expr(void){
+    return assign();
+}
+
+/* assign = equality ("=" assign)? */
+static Node* assign(void){
+    Node* np = equality();
+    if(consume("="))
+        np = new_node(ND_ASSIGN, np, assign());
+    return np;
 }
 
 /* equality = relational ("==" relational | "!=" relational)* */
@@ -246,14 +310,22 @@ static Node* unary(void){
     }
 }
 
-/* primary = num | (expr) */
+/* primary = num | ident | "(" expr ")" */
 static Node* primary(void){
+    Node* np;
+    char ident;
     /* "("ならexprを呼ぶ */
     if(consume("(")){
-        Node* np = expr();
+        np = expr();
         expect(")");
-        return np;
     }
-    /* そうでなければ数値のはず */
-    return new_node_num(expect_number());
+    else if(consume_ident(&ident)){
+        int offset = (ident - 'a' + 1) * 8; /* rbpのアドレスにはsaved rbpがあるので、+1している。 */
+        np = new_node_ident(offset);
+    }
+    else{
+        /* そうでなければ数値のはず */
+        np = new_node_num(expect_number());
+    }
+    return np;
 }
