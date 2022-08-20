@@ -25,6 +25,20 @@ struct Token{
 Token *token; /* 構文解析、意味解析に使う。 */
 
 /* error表示用の関数 */
+char* input;
+
+void error_at(char *loc, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  int pos = loc - input; /* ポインタの引き算は要素数を返す。*/
+  fprintf(ERROR, "%s\n", input);
+  fprintf(ERROR, "%*s", pos, " "); /* pos個の空白を表示 */
+  fprintf(ERROR, "^ ");
+  vfprintf(ERROR, fmt, ap); 
+  fprintf(ERROR, "\n");
+  exit(1);
+}
+
 void error(char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
@@ -64,9 +78,12 @@ void display(Token *tp){
 }
 
 /* 入力文字列をトークナイズしてそれを返す */
-Token* tokenize(char *p){
+Token* tokenize(void){
     Token head; /* これは無駄になるがスタック領域なのでオーバーヘッドは0に等しい */
     Token* cur = &head;
+
+    char *p = input;
+
     while(*p){
         /* is~関数は偽のときに0を、真の時に0以外を返す。*/
         /* spaceだった場合は無視。 */
@@ -92,7 +109,7 @@ Token* tokenize(char *p){
         }
 
         /* それ以外 */
-        error("トークナイズできません\n");
+        error_at(p, "トークナイズできません\n");
     }
 
     /* 終了を表すトークンを作成 */
@@ -115,14 +132,14 @@ bool consume(char op){
 /* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
 void expect(char op){
     if(token -> kind != TK_RESERVED || token -> str[0] != op)
-        error("%cではありません\n", op);
+        error_at(token->str, "%cではありません\n", op);
     token = token -> next;
 }
 
 /* TK_NUM用。次のトークンが数値の時に数値を返す。それ以外の時エラー */
 int expect_number(void){
     if( token -> kind != TK_NUM)
-        error("数ではありません\n");
+        error_at(token->str, "数ではありません\n");
     int val = token -> val;
     token = token -> next;
     return val;
@@ -139,8 +156,11 @@ int main(int argc, char* argv[]){
         return EXIT_FAILURE;
     }
 
+    /* 入力を保存 */
+    input = argv[1];
+
     /* tokenize */
-    token = tokenize(argv[1]);
+    token = tokenize();
 
      /* アセンブリの前半を出力 */
     fprintf(STREAM, ".intel_syntax noprefix\n");
