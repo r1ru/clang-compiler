@@ -1,58 +1,12 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-#include <ctype.h>
-#include <stdbool.h>
-
-#define STREAM stdout
-#define ERROR stderr
-
-/* 字句解析用 */
-typedef enum{
-    TK_RESERVED,
-    TK_NUM,
-    TK_EOF
-}TokenKind;
-
-typedef struct Token Token;
-
-struct Token{
-    TokenKind kind;
-    Token* next;
-    int val;
-    char* str;
-    int len; /* トークンの長さ */
-};
+#include "9cc.h"
 
 /* 構文解析用*/
 Token *token;
 
-typedef enum{
-    ND_ADD,
-    ND_SUB,
-    ND_MUL,
-    ND_DIV,
-    ND_NUM,
-    ND_EQ, // ==
-    ND_NE, // !=
-    ND_LT, // < less than
-    ND_LE, // <= less than or equal to
-}NodeKind;
-
-typedef struct Node Node;
-
-struct Node{
-    NodeKind kind;
-    Node *lhs; /* left hand side */
-    Node *rhs; /* right hand side */
-    int val; /* ND_NUM用 */ 
-};
-
 /* error表示用の関数 */
 char* input;
 
-void error_at(char *loc, char *fmt, ...) {
+static void error_at(char *loc, char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   int pos = loc - input; /* ポインタの引き算は要素数を返す。*/
@@ -64,7 +18,7 @@ void error_at(char *loc, char *fmt, ...) {
   exit(1);
 }
 
-void error(char *fmt, ...) {
+static void error(char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   vfprintf(stderr, fmt, ap);
@@ -75,7 +29,7 @@ void error(char *fmt, ...) {
 /* 字句解析用 */
 
 /* 新しいtokenを作成してcurにつなげる。*/
-Token* new_token(TokenKind kind, Token* cur, char* str, int len){
+static Token* new_token(TokenKind kind, Token* cur, char* str, int len){
     Token* tp = calloc(1, sizeof(Token));
     tp -> kind = kind;
     tp -> str = str;
@@ -85,7 +39,7 @@ Token* new_token(TokenKind kind, Token* cur, char* str, int len){
 }
 
 /* for dubug */
-void display(Token *tp){
+static void display(Token *tp){
 
     if(tp -> kind == TK_NUM){
         fprintf(STREAM, "TK_NUM, val: %d, len: %d\n", tp -> val, tp -> len);
@@ -104,7 +58,7 @@ void display(Token *tp){
 }
 
 /* 文字列を比較。memcmpは成功すると0を返す。 */
-bool startswith(char* p1, char* p2){
+static bool startswith(char* p1, char* p2){
     return memcmp(p1, p2, strlen(p2)) == 0;
 }
 
@@ -163,7 +117,7 @@ Token* tokenize(void){
 
 /* 構文解析と意味解析用 */
 /* TK_RESERVED用。トークンが期待した記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
-bool consume(char* op){
+static bool consume(char* op){
     if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
         return false;
     token = token -> next;
@@ -171,14 +125,14 @@ bool consume(char* op){
 }
 
 /* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
-void expect(char* op){
+static void expect(char* op){
     if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
         error_at(token->str, "%cではありません\n", op);
     token = token -> next;
 }
 
 /* TK_NUM用。トークンが数値の時に数値を返す。それ以外の時エラー */
-int expect_number(void){
+static int expect_number(void){
     if( token -> kind != TK_NUM)
         error_at(token->str, "数ではありません\n");
     int val = token -> val;
@@ -187,12 +141,12 @@ int expect_number(void){
 }
 
 /* TK_EOF用。トークンがEOFかどうかを返す。*/
-bool at_eof(){
+static bool at_eof(){
     return token -> kind == TK_EOF;
 }
 
 /* 新しいnodeを作成 */
-Node* new_node(NodeKind kind, Node* lhs, Node* rhs){
+static Node* new_node(NodeKind kind, Node* lhs, Node* rhs){
     Node* np = calloc(1, sizeof(Node));
     np -> kind = kind;
     np -> lhs = lhs;
@@ -201,7 +155,7 @@ Node* new_node(NodeKind kind, Node* lhs, Node* rhs){
 }
 
 /* ND_NUMを作成 */
-Node* new_node_num(int val){
+static Node* new_node_num(int val){
     Node *np = calloc(1, sizeof(Node));
     np -> kind = ND_NUM;
     np -> val = val;
@@ -209,12 +163,12 @@ Node* new_node_num(int val){
 }
 
 Node* expr(void);
-Node* equality(void);
-Node * relational(void);
-Node* add(void);
-Node* mul(void);
-Node* unary(void);
-Node* primary(void);
+static Node* equality(void);
+static Node * relational(void);
+static Node* add(void);
+static Node* mul(void);
+static Node* unary(void);
+static Node* primary(void);
 
 /* expr = equality */
 Node* expr(void){
@@ -222,7 +176,7 @@ Node* expr(void){
 }
 
 /* equality = relational ("==" relational | "!=" relational)* */
-Node* equality(void){
+static Node* equality(void){
     Node* np = relational();
     for(;;){
         if(consume("=="))
@@ -235,7 +189,7 @@ Node* equality(void){
 }
 
 /* relational = add ("<" add | "<=" add | ">" add | ">=" add)* */
-Node* relational(void){
+static Node* relational(void){
     Node* np = add();
     for(;;){
         if(consume("<"))
@@ -252,7 +206,7 @@ Node* relational(void){
 }
 
 /* add = mul ("+" mul | "-" mul)* */
-Node* add(void){
+static Node* add(void){
     Node* np = mul();
     for(;;){
         if(consume("+"))
@@ -265,7 +219,7 @@ Node* add(void){
 }
 
 /* mul = unary ("*" unary | "/" unary)* */
-Node* mul(void){
+static Node* mul(void){
     Node* np = unary();
     for(;;){
         if(consume("*"))
@@ -278,7 +232,7 @@ Node* mul(void){
 }
 
 /* unary = ("+" | "-")? primary */
-Node* unary(void){
+static Node* unary(void){
     /* +はそのまま */
     if(consume("+")){
         return primary();
@@ -293,7 +247,7 @@ Node* unary(void){
 }
 
 /* primary = num | (expr) */
-Node* primary(void){
+static Node* primary(void){
     /* "("ならexprを呼ぶ */
     if(consume("(")){
         Node* np = expr();
@@ -302,98 +256,4 @@ Node* primary(void){
     }
     /* そうでなければ数値のはず */
     return new_node_num(expect_number());
-}
-
-/* コードを生成 */
-void gen(Node* np){
-
-    /* ND_KINDなら入力が一つの数値だったということ。*/
-    if(np -> kind == ND_NUM){
-        fprintf(STREAM, "\tpush %d\n", np -> val);
-        return;
-    }
-
-    /* 左辺と右辺を計算 */
-    gen(np -> lhs);
-    gen(np -> rhs);
-
-    fprintf(STREAM, "\tpop rdi\n"); //rhs
-    fprintf(STREAM, "\tpop rax\n"); //lhs
-
-    switch( np -> kind){
-
-        case ND_ADD:
-            fprintf(STREAM, "\tadd rax, rdi\n");
-            break;
-        
-        case ND_SUB:
-            fprintf(STREAM, "\tsub rax, rdi\n");
-            break;
-
-        case ND_MUL:
-            fprintf(STREAM, "\timul rax, rdi\n");
-            break;
-
-        case ND_DIV:
-            fprintf(STREAM, "\tcqo\n");
-            fprintf(STREAM, "\tidiv rdi\n");
-            break;
-
-        case ND_EQ:
-            fprintf(STREAM, "\tcmp rax, rdi\n");
-            fprintf(STREAM, "\tsete al\n"); /* rflagsから必要なフラグをコピー恐らくZF */
-            fprintf(STREAM, "\tmovzb rax, al\n"); /* 上位ビットを0埋め。(eaxへのmov以外、上位ビットは変更されない)*/
-            break;
-
-        case ND_NE:
-            fprintf(STREAM, "\tcmp rax, rdi\n");
-            fprintf(STREAM, "\tsetne al\n");
-            fprintf(STREAM, "\tmovzb rax, al\n");
-            break;
-
-        case ND_LT:
-            fprintf(STREAM, "\tcmp rax, rdi\n");
-            fprintf(STREAM, "\tsetl al\n");
-            fprintf(STREAM, "\tmovzb rax, al\n");
-            break;
-        
-        case ND_LE:
-            fprintf(STREAM, "\tcmp rax, rdi\n");
-            fprintf(STREAM, "\tsetle al\n");
-            fprintf(STREAM, "\tmovzb rax, al\n");
-            break;
-    }
-
-    fprintf(STREAM, "\tpush rax\n");
-}
-
-int main(int argc, char* argv[]){
-    if(argc != 2){
-        fprintf(ERROR, "引数の個数が正しくありません\n");
-        return EXIT_FAILURE;
-    }
-
-    /* 入力を保存 */
-    input = argv[1];
-
-    /* tokenize */
-    token = tokenize();
-
-    /* 構文解析 */
-    Node *np  = expr();
-
-     /* アセンブリの前半を出力 */
-    fprintf(STREAM, ".intel_syntax noprefix\n");
-    fprintf(STREAM, ".global main\n");
-    fprintf(STREAM, "main:\n");
-
-    /* コード生成 */
-    gen(np);
-
-    /* 結果をpop */
-    fprintf(STREAM, "\tpop rax\n");
-    fprintf(STREAM, "\tret\n");
-    
-    return 0;
-
 }
