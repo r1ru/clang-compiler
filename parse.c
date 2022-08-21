@@ -123,7 +123,7 @@ void tokenize(void){
         }
 
          /* returnの場合(これはローカル変数よりも前に来なければならない。) */
-        if(strncmp(p , "return", 6) == 0){
+        if(startswith(p, "return")){
             cur = new_token(TK_RET, cur, p, 6);
             //display_token(cur);
             p += 6;
