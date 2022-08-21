@@ -409,7 +409,6 @@ static Node* stmt(void){
         expect(")");
         np -> then = stmt();
         if(consume_else()){
-            np -> kind = ND_IF_ELSE; // 種類を変更。
             np -> els = stmt();
         }
         return np;
