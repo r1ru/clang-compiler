@@ -40,6 +40,15 @@ void gen(Node* np){
             fprintf(STREAM, "\tpop rbp\n");
             fprintf(STREAM, "\tret\n"); /* return の右に指定された式の値が返り値になる。*/
             return;
+
+        case ND_IF:
+            gen(np -> cond);
+            fprintf(STREAM, "\tpop rax\n");
+            fprintf(STREAM, "\tcmp rax, 1\n");
+            fprintf(STREAM, "\tjne .Lend\n"); // 条件式が偽の時は何も実行しない
+            gen(np -> then); // 条件式が真の時は実行する
+            fprintf(STREAM, ".Lend:");
+            return;
     }
 
     /* 左辺と右辺を計算 */

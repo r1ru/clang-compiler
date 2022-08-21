@@ -254,6 +254,15 @@ static bool consume_ret(void){
     return true;
 }
 
+/* TK_IF用。トークンがifだったときトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
+static bool consume_if(void){
+    if(token -> kind != TK_IF){
+        return false;
+    }
+    token = token -> next;
+    return true;
+}
+
 /* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
 static void expect(char* op){
     if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
@@ -342,14 +351,28 @@ void program(void){
     code[i] = NULL; /* 終了をマーク */
 }
 
-/* stmt = expr ";" | "return" expr ";" */
+/* stmt = expr ";" 
+        | "return" expr ";" 
+        | "if" "(" expr ")" stmt */
 static Node* stmt(void){
     Node* np;
     if(consume_ret()){
         np = new_node(ND_RET, NULL, expr());
-    }else{
-        np = expr();
+        expect(";");
+        return np;
     }
+
+    if(consume_if()){
+        expect("(");
+        np = calloc(1, sizeof(Node));
+        np -> kind = ND_IF;
+        np -> cond = expr();
+        expect(")");
+        np -> then = stmt();
+        return np;
+    }
+    
+    np = expr();
     expect(";");
     return np;
 }
