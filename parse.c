@@ -272,6 +272,15 @@ static bool consume_else(void){
     return true;
 }
 
+/* TK_WHILE用。トークンがwhileだったときトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
+static bool consume_while(void){
+    if(token -> kind != TK_WHILE){
+        return false;
+    }
+    token = token -> next;
+    return true;
+}
+
 /* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
 static void expect(char* op){
     if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
@@ -362,15 +371,19 @@ void program(void){
 
 /* stmt = expr ";" 
         | "return" expr ";" 
-        | "if" "(" expr ")" stmt ("else" stmt)?*/
+        | "if" "(" expr ")" stmt ("else" stmt)?
+        | "while" "(" expr ")" stmt*/
 static Node* stmt(void){
     Node* np;
+
+    /* "return" expr ";" */
     if(consume_ret()){
         np = new_node(ND_RET, NULL, expr());
         expect(";");
         return np;
     }
 
+    /* "if" "(" expr ")" stmt ("else" stmt)? */
     if(consume_if()){
         expect("(");
         np = calloc(1, sizeof(Node));
@@ -384,7 +397,19 @@ static Node* stmt(void){
         }
         return np;
     }
+
+    /* "while" "(" expr ")" stmt */
+    if(consume_while()){
+        expect("(");
+        np = calloc(1, sizeof(Node));
+        np -> kind = ND_WHILE;
+        np -> cond = expr();
+        expect(")");
+        np -> then = stmt();
+        return np;
+    }
     
+    /* expr ";" */
     np = expr();
     expect(";");
     return np;

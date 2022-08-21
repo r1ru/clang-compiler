@@ -59,9 +59,21 @@ void gen(Node* np){
             fprintf(STREAM, "\tjne .L%u\n", llabel_index); // 条件式が偽の時はelseに指定されているコードに飛ぶ
             gen(np -> then); // 条件式が真のときに実行される。
             fprintf(STREAM, "jmp .Lend\n");
-            fprintf(STREAM, ".L%d:\n", llabel_index);
+            fprintf(STREAM, ".L%u:\n", llabel_index);
             gen(np -> els); // 条件式が偽の時に実行される。
-            fprintf(STREAM, ".Lend:");
+            fprintf(STREAM, ".Lend:\n");
+            llabel_index++; // インデックスを更新
+            return;
+        
+        case ND_WHILE:
+            fprintf(STREAM, ".L%u:\n", llabel_index);
+            gen(np -> cond);
+            fprintf(STREAM, "\tpop rax\n");
+            fprintf(STREAM, "\tcmp rax, 1\n");
+            fprintf(STREAM, "\tjne .Lend\n"); // 条件式が偽の時は終了
+            gen(np -> then); // 条件式が真の時に実行される。
+            fprintf(STREAM, "\tjmp .L%u\n", llabel_index); // 条件式の評価に戻る
+            fprintf(STREAM, ".Lend:\n");
             llabel_index++; // インデックスを更新
             return;
     }
