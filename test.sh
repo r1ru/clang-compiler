@@ -52,5 +52,7 @@ assert 5 'return 5;'
 assert 14 'a = 3; b = 5 * 6 - 8; return a + b / 2;'
 
 assert 3 'i=2; if(i == 2) i+1;'
+assert 4 'if (0) return 3; else return 4;'
+assert 3 'if (1) return 3; else return 4;'
 
 echo OK

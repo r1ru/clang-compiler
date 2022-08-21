@@ -1,5 +1,7 @@
 #include "9cc.h"
 
+static unsigned int llabel_index; // ローカルラベル用のインデックス
+
 /* 式を左辺値として評価する */
 void gen_lval(Node *np) {
     if (np->kind != ND_LVAR)
@@ -46,8 +48,21 @@ void gen(Node* np){
             fprintf(STREAM, "\tpop rax\n");
             fprintf(STREAM, "\tcmp rax, 1\n");
             fprintf(STREAM, "\tjne .Lend\n"); // 条件式が偽の時は何も実行しない
-            gen(np -> then); // 条件式が真の時は実行する
+            gen(np -> then); // 条件式が真の時に実行される。
             fprintf(STREAM, ".Lend:");
+            return;
+        
+        case ND_IF_ELSE:
+            gen(np -> cond);
+            fprintf(STREAM, "\tpop rax\n");
+            fprintf(STREAM, "\tcmp rax, 1\n");
+            fprintf(STREAM, "\tjne .L%u\n", llabel_index); // 条件式が偽の時はelseに指定されているコードに飛ぶ
+            gen(np -> then); // 条件式が真のときに実行される。
+            fprintf(STREAM, "jmp .Lend\n");
+            fprintf(STREAM, ".L%d:\n", llabel_index);
+            gen(np -> els); // 条件式が偽の時に実行される。
+            fprintf(STREAM, ".Lend:");
+            llabel_index++; // インデックスを更新
             return;
     }
 

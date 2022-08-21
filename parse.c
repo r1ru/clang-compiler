@@ -263,6 +263,15 @@ static bool consume_if(void){
     return true;
 }
 
+/* TK_ELSE用。トークンがelseだったときトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
+static bool consume_else(void){
+    if(token -> kind != TK_ELSE){
+        return false;
+    }
+    token = token -> next;
+    return true;
+}
+
 /* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
 static void expect(char* op){
     if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
@@ -353,7 +362,7 @@ void program(void){
 
 /* stmt = expr ";" 
         | "return" expr ";" 
-        | "if" "(" expr ")" stmt */
+        | "if" "(" expr ")" stmt ("else" stmt)?*/
 static Node* stmt(void){
     Node* np;
     if(consume_ret()){
@@ -369,6 +378,10 @@ static Node* stmt(void){
         np -> cond = expr();
         expect(")");
         np -> then = stmt();
+        if(consume_else()){
+            np -> kind = ND_IF_ELSE; // 種類を変更。
+            np -> els = stmt();
+        }
         return np;
     }
     
