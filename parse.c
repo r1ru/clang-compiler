@@ -234,12 +234,22 @@ static bool is_equal(char* op){
     return true;
 }
 
-/* TK_RESERVED用。トークンが期待した記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
-static bool consume(char* op){
-    if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
-        return false;
-    token = token -> next;
-    return true;
+/* トークンが期待した種類の記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
+static bool consume(TokenKind kind, char* op){
+    switch(kind){
+        /* TK_RESERVEDの場合は文字列が一致するかチェック */
+        case TK_RESERVED:
+            if(strlen(op) != token -> len || memcmp(op, token -> str, token -> len)){
+                return false;
+            }
+        /* それ以外の場合はkindが一致するか調べるのみ */
+        default:
+            if(kind != token -> kind){
+                return false;
+            }
+        token = token -> next;
+        return true;
+    }
 }
 
 /* TK_IDENT用。トークンが識別子のときはトークンを読み進めてTK_IDENTへのポインタを返す。それ以外のときはNULLを返す。*/
@@ -250,51 +260,6 @@ static Token* consume_ident(void){
     Token* tp = token;
     token = token -> next;
     return tp;
-}
-
-/* TK_RET用。トークンがreturnだったときトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
-static bool consume_ret(void){
-    if(token -> kind != TK_RET){
-        return false;
-    }
-    token = token -> next;
-    return true;
-}
-
-/* TK_IF用。トークンがifだったときトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
-static bool consume_if(void){
-    if(token -> kind != TK_IF){
-        return false;
-    }
-    token = token -> next;
-    return true;
-}
-
-/* TK_ELSE用。トークンがelseだったときトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
-static bool consume_else(void){
-    if(token -> kind != TK_ELSE){
-        return false;
-    }
-    token = token -> next;
-    return true;
-}
-
-/* TK_WHILE用。トークンがwhileだったときトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
-static bool consume_while(void){
-    if(token -> kind != TK_WHILE){
-        return false;
-    }
-    token = token -> next;
-    return true;
-}
-
-/* TK_FOR用。トークンがforだったときトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
-static bool consume_for(void){
-    if(token -> kind != TK_FOR){
-        return false;
-    }
-    token = token -> next;
-    return true;
 }
 
 /* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
@@ -394,28 +359,28 @@ static Node* stmt(void){
     Node* np;
 
     /* "return" expr ";" */
-    if(consume_ret()){
+    if(consume(TK_RET, NULL)){
         np = new_node(ND_RET, NULL, expr());
         expect(";");
         return np;
     }
 
     /* "if" "(" expr ")" stmt ("else" stmt)? */
-    if(consume_if()){
+    if(consume(TK_IF, NULL)){
         expect("(");
         np = calloc(1, sizeof(Node));
         np -> kind = ND_IF;
         np -> cond = expr();
         expect(")");
         np -> then = stmt();
-        if(consume_else()){
+        if(consume(TK_ELSE, NULL)){
             np -> els = stmt();
         }
         return np;
     }
 
     /* "while" "(" expr ")" stmt */
-    if(consume_while()){
+    if(consume(TK_WHILE, NULL)){
         expect("(");
         np = calloc(1, sizeof(Node));
         np -> kind = ND_WHILE;
@@ -426,7 +391,7 @@ static Node* stmt(void){
     }
 
     /* "for" "(" expr? ";" expr? ";" expr? ")" stmt */
-    if(consume_for()){
+    if(consume(TK_FOR, NULL)){
         expect("(");
         np = calloc(1, sizeof(Node));
         np -> kind = ND_FOR;
@@ -460,7 +425,7 @@ static Node* expr(void){
 /* assign = equality ("=" assign)? */
 static Node* assign(void){
     Node* np = equality();
-    if(consume("="))
+    if(consume(TK_RESERVED, "="))
         np = new_node(ND_ASSIGN, np, assign());
     return np;
 }
@@ -469,9 +434,9 @@ static Node* assign(void){
 static Node* equality(void){
     Node* np = relational();
     for(;;){
-        if(consume("=="))
+        if(consume(TK_RESERVED, "=="))
             np = new_node(ND_EQ, np, relational());
-        else if(consume("!="))
+        else if(consume(TK_RESERVED, "!="))
             np = new_node(ND_NE, np, relational());
         else 
             return np;
@@ -482,13 +447,13 @@ static Node* equality(void){
 static Node* relational(void){
     Node* np = add();
     for(;;){
-        if(consume("<"))
+        if(consume(TK_RESERVED, "<"))
             np = new_node(ND_LT, np, add());
-        else if(consume("<="))
+        else if(consume(TK_RESERVED, "<="))
             np = new_node(ND_LE, np , add());
-        else if(consume(">"))
+        else if(consume(TK_RESERVED, ">"))
             np = new_node(ND_LT, add(), np); /* x > y は y < xと同じ。 */
-        else if(consume(">="))
+        else if(consume(TK_RESERVED, ">="))
             np = new_node(ND_LE, add(), np); /* x >= y は y <= xと同じ */
         else 
             return np;
@@ -499,9 +464,9 @@ static Node* relational(void){
 static Node* add(void){
     Node* np = mul();
     for(;;){
-        if(consume("+"))
+        if(consume(TK_RESERVED, "+"))
             np = new_node(ND_ADD, np, mul());
-        else if(consume("-"))
+        else if(consume(TK_RESERVED, "-"))
             np = new_node(ND_SUB, np, mul());
         else
             return np;
@@ -512,9 +477,9 @@ static Node* add(void){
 static Node* mul(void){
     Node* np = unary();
     for(;;){
-        if(consume("*"))
+        if(consume(TK_RESERVED, "*"))
             np = new_node(ND_MUL, np, unary());
-        else if(consume("/"))
+        else if(consume(TK_RESERVED, "/"))
             np = new_node(ND_DIV, np, unary());
         else 
             return np;
@@ -524,11 +489,11 @@ static Node* mul(void){
 /* unary = ("+" | "-")? primary */
 static Node* unary(void){
     /* +はそのまま */
-    if(consume("+")){
+    if(consume(TK_RESERVED, "+")){
         return primary();
     }
     /* -xは0 - xと解釈する。 */
-    else if(consume("-")){
+    else if(consume(TK_RESERVED, "-")){
         return new_node(ND_SUB, new_node_num(0), primary());
     }
     else{
@@ -542,7 +507,7 @@ static Node* primary(void){
     Token* tp;
 
     /* "("ならexprを呼ぶ */
-    if(consume("(")){
+    if(consume(TK_RESERVED, "(")){
         np = expr();
         expect(")");
         return np;
