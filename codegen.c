@@ -32,6 +32,14 @@ void gen(Node* np){
             fprintf(STREAM, "\tmov [rax], rdi\n"); /* ローカル変数へ代入 */
             fprintf(STREAM, "\tpush rdi\n"); /* 代入式の評価結果は代入した値とする。 */
             return;
+        
+        case ND_RET:
+            gen(np -> rhs);
+            fprintf(STREAM, "\tpop rax\n");
+            fprintf(STREAM, "\tmov rsp, rbp\n");
+            fprintf(STREAM, "\tpop rbp\n");
+            fprintf(STREAM, "\tret\n"); /* return の右に指定された式の値が返り値になる。*/
+            return;
     }
 
     /* 左辺と右辺を計算 */

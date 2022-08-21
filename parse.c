@@ -58,6 +58,11 @@ static void display_token(Token *tp){
         return;
     }
 
+    if(tp -> kind == TK_RET){
+        fprintf(STREAM, "TK_RET, str: %.*s\n", tp -> len, tp -> str);
+        return;
+    }
+
     if(tp -> kind == TK_EOF){
         fprintf(STREAM, "TK_EOF\n");
         return;
@@ -116,7 +121,16 @@ void tokenize(void){
             p++;
             continue;
         }
+
+         /* returnの場合(これはローカル変数よりも前に来なければならない。) */
+        if(strncmp(p , "return", 6) == 0){
+            cur = new_token(TK_RET, cur, p, 6);
+            //display_token(cur);
+            p += 6;
+            continue;
+        }
         
+        /* ローカル変数の場合 */
         if(ischar(*p)){
             cur = new_token(TK_IDENT, cur, p, 0);
             q = p;
@@ -183,6 +197,15 @@ static Token* consume_ident(void){
     Token* tp = token;
     token = token -> next;
     return tp;
+}
+
+/* TK_RET用。トークンがreturnだったときトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
+static bool consume_ret(void){
+    if(token -> kind != TK_RET){
+        return false;
+    }
+    token = token -> next;
+    return true;
 }
 
 /* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
@@ -273,9 +296,14 @@ void program(void){
     code[i] = NULL; /* 終了をマーク */
 }
 
-/* stmt = expr ";" */
+/* stmt = expr ";" | "return" expr ";" */
 static Node* stmt(void){
-    Node* np = expr();
+    Node* np;
+    if(consume_ret()){
+        np = new_node(ND_RET, NULL, expr());
+    }else{
+        np = expr();
+    }
     expect(";");
     return np;
 }

@@ -18,7 +18,8 @@ typedef enum{
     TK_RESERVED,
     TK_IDENT, /* 識別子 */
     TK_NUM,
-    TK_EOF
+    TK_EOF,
+    TK_RET /* return */
 }TokenKind;
 
 struct Token{
@@ -40,7 +41,8 @@ typedef enum{
     ND_LE, // <= less than or equal to
     ND_ASSIGN, // =
     ND_LVAR, // local variable
-    ND_NUM
+    ND_NUM,
+    ND_RET // return
 }NodeKind;
 
 typedef struct Node Node;
