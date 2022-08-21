@@ -43,29 +43,43 @@ static Token* new_token(TokenKind kind, Token* cur, char* str, int len){
 /* for dubug */
 static void display_token(Token *tp){
 
-    if(tp -> kind == TK_NUM){
-        fprintf(STREAM, "TK_NUM, val: %d\n", tp -> val);
-        return;
-    }
+    switch(tp -> kind){
 
-    if(tp -> kind == TK_IDENT){
-        fprintf(STREAM, "TK_IDENT, ident: %.*s\n", tp -> len , tp -> str);
-        return;
-    }
+        case TK_RESERVED:
+            fprintf(debug, "TK_RESERVED, str: %.*s\n", tp -> len, tp -> str);
+            return;
 
-    if(tp -> kind == TK_RESERVED){
-        fprintf(STREAM, "TK_RESERVED, str: %.*s\n", tp -> len, tp -> str);
-        return;
-    }
+        case TK_IDENT:
+            fprintf(debug, "TK_IDENT, ident: %.*s\n", tp -> len , tp -> str);
+            return;
 
-    if(tp -> kind == TK_RET){
-        fprintf(STREAM, "TK_RET, str: %.*s\n", tp -> len, tp -> str);
-        return;
-    }
+        case TK_NUM:
+            fprintf(debug, "TK_NUM, val: %d\n", tp -> val);
+            return;
 
-    if(tp -> kind == TK_EOF){
-        fprintf(STREAM, "TK_EOF\n");
-        return;
+        case TK_EOF:
+            fprintf(debug, "TK_EOF\n");
+            return;
+
+        case TK_RET:
+            fprintf(debug, "TK_RET, str: %.*s\n", tp -> len, tp -> str);
+            return;
+        
+        case TK_IF:
+            fprintf(debug, "TK_IF, str: %.*s\n", tp -> len, tp -> str);
+            return;
+        
+        case TK_ELSE:
+            fprintf(debug, "TK_ELSE, str: %.*s\n", tp -> len, tp -> str);
+            return;
+        
+        case TK_WHILE:
+            fprintf(debug, "TK_WHILE, str: %.*s\n", tp -> len, tp -> str);
+            return;
+
+        case TK_FOR:
+            fprintf(debug, "TK_FOR, str: %.*s\n", tp -> len, tp -> str);
+            return;
     }
 }
 
@@ -100,7 +114,7 @@ void tokenize(void){
             q = p;
             cur -> val = strtol(p, &p, 10);
             cur -> len = p - q; /* 長さを記録 */
-            //display_token(cur);
+            display_token(cur);
             continue;
         }
 
@@ -108,7 +122,7 @@ void tokenize(void){
         /* 可変長operator。これを先に置かないと例えば<=が<と=という二つに解釈されてしまう。*/
         if(startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=")) {
             cur = new_token(TK_RESERVED, cur, p, 2);
-            //display_token(cur);
+            display_token(cur);
             p += 2;
             continue;
         }
@@ -117,7 +131,7 @@ void tokenize(void){
         strchrは第一引数で渡された検索対象から第二引数の文字を探してあればその文字へのポインターを、なければNULLを返す。*/
         if(strchr("+-*/()<>;=", *p)){
             cur = new_token(TK_RESERVED, cur, p, 1);
-            //display_token(cur);
+            display_token(cur);
             p++;
             continue;
         }
@@ -125,11 +139,43 @@ void tokenize(void){
          /* returnの場合(これはローカル変数よりも前に来なければならない。) */
         if(startswith(p, "return")){
             cur = new_token(TK_RET, cur, p, 6);
-            //display_token(cur);
+            display_token(cur);
             p += 6;
             continue;
         }
-        
+
+        /* ifの場合 */
+        if(startswith(p, "if")){
+            cur = new_token(TK_IF, cur, p, 2);
+            display_token(cur);
+            p += 2;
+            continue;
+        }
+
+        /* elseの場合 */
+        if(startswith(p, "else")){
+            cur = new_token(TK_ELSE, cur, p, 4);
+            display_token(cur);
+            p += 4;
+            continue;
+        }
+
+        /* whileの場合 */
+        if(startswith(p, "while")){
+            cur = new_token(TK_WHILE, cur, p, 5);
+            display_token(cur);
+            p += 5;
+            continue;
+        }
+
+        /* forの場合 */
+        if(startswith(p, "for")){
+            cur = new_token(TK_FOR, cur, p, 3);
+            display_token(cur);
+            p += 3;
+            continue;
+        }
+
         /* ローカル変数の場合 */
         if(ischar(*p)){
             cur = new_token(TK_IDENT, cur, p, 0);
@@ -138,7 +184,7 @@ void tokenize(void){
                 p++;
             }
             cur -> len = p - q; /* 長さを記録 */
-            //display_token(cur);
+            display_token(cur);
             
             continue;
         }

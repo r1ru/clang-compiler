@@ -16,10 +16,14 @@ typedef struct Token Token;
 /* 字句解析用 */
 typedef enum{
     TK_RESERVED,
-    TK_IDENT, /* 識別子 */
+    TK_IDENT, // 識別子
     TK_NUM,
     TK_EOF,
-    TK_RET /* return */
+    TK_RET, // return
+    TK_IF, // if
+    TK_ELSE, // else
+    TK_WHILE, // while
+    TK_FOR // for
 }TokenKind;
 
 struct Token{
@@ -27,7 +31,7 @@ struct Token{
     Token* next;
     int val;
     char* str;
-    int len; /* トークンの長さ */
+    int len; // トークンの長さ
 };
 
 typedef enum{
@@ -55,6 +59,7 @@ struct Node{
     int offset; /* ND_LVAL用 */
 };
 
+extern FILE* debug;
 extern char* input;
 extern Node* code[100]; 
 
