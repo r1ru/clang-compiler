@@ -49,20 +49,23 @@ typedef enum{
     ND_RET, // return
     ND_IF, // if
     ND_IF_ELSE, // if-else
-    ND_WHILE // while
+    ND_WHILE, // while
+    ND_FOR // for
 }NodeKind;
 
 typedef struct Node Node;
 
 struct Node{
     NodeKind kind;
-    Node *lhs; /* left hand side */
-    Node *rhs; /* right hand side */
-    Node* cond; // if-else
+    Node *lhs; // left hand side
+    Node *rhs; // right hand side
+    Node* cond; // if, if-else, while, for 
     Node* then;
-    Node* els;
-    int val; /* ND_NUM用 */ 
-    int offset; /* ND_LVAL用 */
+    Node* els; // if-else
+    Node* init; // for
+    Node* inc; 
+    int val; // ND_NUM用
+    int offset; // ND_LVAL用
 };
 
 extern FILE* debug;

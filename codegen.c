@@ -76,6 +76,27 @@ void gen(Node* np){
             fprintf(STREAM, ".Lend:\n");
             llabel_index++; // インデックスを更新
             return;
+
+        case ND_FOR:
+            if(np -> init){
+                gen(np -> init);
+            }
+            fprintf(STREAM, ".L%u:\n", llabel_index);
+            if(np -> cond){
+                gen(np -> cond);
+                fprintf(STREAM, "\tpop rax\n");
+                fprintf(STREAM, "\tcmp rax, 1\n");
+                fprintf(STREAM, "\tjne .Lend\n"); // 条件式が偽の時は終了
+
+            }
+            gen(np -> then); // thenは必ずあることが期待されている。
+            if(np -> inc){
+                gen(np -> inc);
+            }
+            fprintf(STREAM, "\tjmp .L%u\n", llabel_index); // 条件式の評価に戻る
+            fprintf(STREAM, ".Lend:\n");
+            llabel_index++; // インデックスを更新
+            return;
     }
 
     /* 左辺と右辺を計算 */

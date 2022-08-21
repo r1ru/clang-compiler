@@ -227,6 +227,13 @@ static LVar *find_lvar(Token *tp) {
   return NULL;
 }
 
+/* TK_RESERVED用。トークンが期待した記号のときは真を返す。それ以外のときは偽を返す。*/
+static bool is_equal(char* op){
+    if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
+        return false;
+    return true;
+}
+
 /* TK_RESERVED用。トークンが期待した記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
 static bool consume(char* op){
     if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
@@ -275,6 +282,15 @@ static bool consume_else(void){
 /* TK_WHILE用。トークンがwhileだったときトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
 static bool consume_while(void){
     if(token -> kind != TK_WHILE){
+        return false;
+    }
+    token = token -> next;
+    return true;
+}
+
+/* TK_FOR用。トークンがforだったときトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
+static bool consume_for(void){
+    if(token -> kind != TK_FOR){
         return false;
     }
     token = token -> next;
@@ -372,7 +388,8 @@ void program(void){
 /* stmt = expr ";" 
         | "return" expr ";" 
         | "if" "(" expr ")" stmt ("else" stmt)?
-        | "while" "(" expr ")" stmt*/
+        | "while" "(" expr ")" stmt*
+        | "for" "(" expr? ";" expr? ";" expr? ")" stmt*/
 static Node* stmt(void){
     Node* np;
 
@@ -408,7 +425,28 @@ static Node* stmt(void){
         np -> then = stmt();
         return np;
     }
-    
+
+    /* "for" "(" expr? ";" expr? ";" expr? ")" stmt */
+    if(consume_for()){
+        expect("(");
+        np = calloc(1, sizeof(Node));
+        np -> kind = ND_FOR;
+        if(!is_equal(";")){
+            np -> init = expr();
+        }
+        expect(";");
+        if(!is_equal(";")){
+            np -> cond = expr();
+        }
+        expect(";");
+        if(!is_equal(")")){
+            np -> inc = expr();
+        }
+        expect(")");
+        np -> then = stmt();
+        return np;
+    }
+
     /* expr ";" */
     np = expr();
     expect(";");
