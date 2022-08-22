@@ -88,10 +88,6 @@ static bool startswith(char* p1, char* p2){
     return memcmp(p1, p2, strlen(p2)) == 0;
 }
 
-static bool ischar(char c){
-    return 'a' <= c && c <= 'z';
-}
-
 /* 入力文字列をトークナイズしてそれを返す */
 void tokenize(void){
     Token head; /* これは無駄になるがスタック領域なのでオーバーヘッドは0に等しい */
@@ -176,11 +172,11 @@ void tokenize(void){
             continue;
         }
 
-        /* ローカル変数の場合 */
-        if(ischar(*p)){
+        /* ローカル変数の場合(数字が使用される可能性もあることに注意。) */
+        if(isalnum(*p)){
             cur = new_token(TK_IDENT, cur, p, 0);
             q = p;
-            while(ischar(*p)){
+            while(isalnum(*p)){
                 p++;
             }
             cur -> len = p - q; /* 長さを記録 */
