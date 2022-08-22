@@ -129,7 +129,7 @@ void tokenize(void){
 
          /* 一文字operatorの場合。
         strchrは第一引数で渡された検索対象から第二引数の文字を探してあればその文字へのポインターを、なければNULLを返す。*/
-        if(strchr("+-*/()<>;=", *p)){
+        if(strchr("+-*/()<>;={}", *p)){
             cur = new_token(TK_RESERVED, cur, p, 1);
             display_token(cur);
             p++;
@@ -225,6 +225,11 @@ static LVar *find_lvar(Token *tp) {
     }
   }
   return NULL;
+}
+
+/* トークンを読み飛ばす */
+static void skip_token(void){
+    token = token -> next;
 }
 
 /* TK_RESERVED用。トークンが期待した記号のときは真を返す。それ以外のときは偽を返す。*/
@@ -351,12 +356,26 @@ void program(void){
 }
 
 /* stmt = expr ";" 
+        | "{" stmt* "}"
         | "return" expr ";" 
         | "if" "(" expr ")" stmt ("else" stmt)?
         | "while" "(" expr ")" stmt*
         | "for" "(" expr? ";" expr? ";" expr? ")" stmt*/
 static Node* stmt(void){
     Node* np;
+
+    if(consume(TK_RESERVED, "{")){
+        np = calloc(1, sizeof(Node));
+        np -> kind = ND_BLOCK;
+        np -> vec = new_vec();
+
+        while(!is_equal("}")){
+            vec_push(np -> vec, stmt());
+        }
+        
+        skip_token();
+        return np;
+    }
 
     /* "return" expr ";" */
     if(consume(TK_RET, NULL)){

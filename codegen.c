@@ -90,6 +90,13 @@ void gen(Node* np){
             fprintf(STREAM, ".Lend:\n");
             llabel_index++; // インデックスを更新
             return;
+        
+        case ND_BLOCK:
+            for(unsigned int i = 0; i < np -> vec -> len; i++){
+                gen(np -> vec -> data[i]);
+                fprintf(STREAM, "\tpop rax\n");
+            }
+            return;
     }
 
     /* 左辺と右辺を計算 */

@@ -11,6 +11,16 @@
 #define STREAM stdout
 #define ERROR stderr
 
+typedef struct{
+    void** data; // 汎用
+    unsigned int capacity;
+    unsigned int len;
+}Vector;
+
+// defined in utils.c
+Vector* new_vec(void);
+void vec_push(Vector* vp, void* elem);
+
 typedef struct Token Token;
 
 /* 字句解析用 */
@@ -49,7 +59,8 @@ typedef enum{
     ND_RET, // return
     ND_IF, // if
     ND_WHILE, // while
-    ND_FOR // for
+    ND_FOR, // for
+    ND_BLOCK // {}
 }NodeKind;
 
 typedef struct Node Node;
@@ -69,6 +80,8 @@ struct Node{
     Node* init; 
     Node* inc; 
     Node* body;
+
+    Vector* vec; // for compound statement
     int val; // ND_NUM用
     int offset; // ND_LVAL用
 };
