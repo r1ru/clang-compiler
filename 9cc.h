@@ -58,11 +58,17 @@ struct Node{
     NodeKind kind;
     Node *lhs; // left hand side
     Node *rhs; // right hand side
-    Node* cond; // if, if-else, while, for 
-    Node* then;
-    Node* els; // if-else
-    Node* init; // for
+    Node* expr; // "return" expr
+    /*  "if" (cond) then; "else" els;  
+        "for" (init; cond; inc) body
+        "while" (cond) body
+    */
+    Node* cond; 
+    Node* then; 
+    Node* els; 
+    Node* init; 
     Node* inc; 
+    Node* body;
     int val; // ND_NUM用
     int offset; // ND_LVAL用
 };

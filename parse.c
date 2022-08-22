@@ -360,7 +360,9 @@ static Node* stmt(void){
 
     /* "return" expr ";" */
     if(consume(TK_RET, NULL)){
-        np = new_node(ND_RET, NULL, expr());
+        np = calloc(1, sizeof(Node));
+        np -> kind = ND_RET;
+        np -> expr = expr();
         expect(";");
         return np;
     }
@@ -386,7 +388,7 @@ static Node* stmt(void){
         np -> kind = ND_WHILE;
         np -> cond = expr();
         expect(")");
-        np -> then = stmt();
+        np -> body = stmt();
         return np;
     }
 
@@ -407,7 +409,7 @@ static Node* stmt(void){
             np -> inc = expr();
         }
         expect(")");
-        np -> then = stmt();
+        np -> body = stmt(); // bodyは必ず存在することが期待されている。
         return np;
     }
 
@@ -426,7 +428,7 @@ static Node* expr(void){
 static Node* assign(void){
     Node* np = equality();
     if(consume(TK_RESERVED, "="))
-        np = new_node(ND_ASSIGN, np, assign());
+        np = new_node(ND_ASSIGN, np, assign()); // 代入は式。
     return np;
 }
 

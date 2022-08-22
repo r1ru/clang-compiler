@@ -36,7 +36,7 @@ void gen(Node* np){
             return;
         
         case ND_RET:
-            gen(np -> rhs);
+            gen(np -> expr);
             fprintf(STREAM, "\tpop rax\n");
             fprintf(STREAM, "\tmov rsp, rbp\n");
             fprintf(STREAM, "\tpop rbp\n");
@@ -64,7 +64,7 @@ void gen(Node* np){
             fprintf(STREAM, "\tpop rax\n");
             fprintf(STREAM, "\tcmp rax, 1\n");
             fprintf(STREAM, "\tjne .Lend\n"); // 条件式が偽の時は終了
-            gen(np -> then); // 条件式が真の時に実行される。
+            gen(np -> body); // 条件式が真の時に実行される。
             fprintf(STREAM, "\tjmp .L%u\n", llabel_index); // 条件式の評価に戻る
             fprintf(STREAM, ".Lend:\n");
             llabel_index++; // インデックスを更新
@@ -82,7 +82,7 @@ void gen(Node* np){
                 fprintf(STREAM, "\tjne .Lend\n"); // 条件式が偽の時は終了
 
             }
-            gen(np -> then); // thenは必ずあることが期待されている。
+            gen(np -> body); // bodyは必ずあることが期待されている。
             if(np -> inc){
                 gen(np -> inc);
             }
