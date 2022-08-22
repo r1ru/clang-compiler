@@ -503,15 +503,15 @@ static Node* mul(void){
     }
 }
 
-/* unary = ("+" | "-")? primary */
+/* unary = ("+" | "-")? unary | primary ( - - 10のように連続する場合があるため。)*/
 static Node* unary(void){
     /* +はそのまま */
     if(consume(TK_RESERVED, "+")){
-        return primary();
+        return unary();
     }
     /* -xは0 - xと解釈する。 */
     else if(consume(TK_RESERVED, "-")){
-        return new_node(ND_SUB, new_node_num(0), primary());
+        return new_node(ND_SUB, new_node_num(0), unary());
     }
     else{
         return primary();
