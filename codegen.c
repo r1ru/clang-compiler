@@ -97,6 +97,11 @@ void gen(Node* np){
                 fprintf(STREAM, "\tpop rax\n");
             }
             return;
+        
+        case ND_FUNCCALL:
+            fprintf(STREAM, "\tcall %s\n", np -> funcname);
+            fprintf(STREAM, "\tpush rax\n"); // 返り値をスタックにpush
+            return;
     }
 
     /* 左辺と右辺を計算 */

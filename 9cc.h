@@ -60,7 +60,8 @@ typedef enum{
     ND_IF, // if
     ND_WHILE, // while
     ND_FOR, // for
-    ND_BLOCK // {}
+    ND_BLOCK, // {}
+    ND_FUNCCALL // function call
 }NodeKind;
 
 typedef struct Node Node;
@@ -80,6 +81,8 @@ struct Node{
     Node* init; 
     Node* inc; 
     Node* body;
+
+    char* funcname; // function name
 
     Vector* vec; // for compound statement
     int val; // ND_NUM用

@@ -518,7 +518,7 @@ static Node* unary(void){
     }
 }
 
-/* primary = num | ident | "(" expr ")" */
+/* primary = num | ident ("(" ")")? | "(" expr ")" */
 static Node* primary(void){
     Node* np;
     Token* tp;
@@ -533,6 +533,14 @@ static Node* primary(void){
     /* 識別子トークンの場合 */
     tp = consume_ident();
     if(tp){
+        if(consume(TK_RESERVED, "(")){
+            np = calloc(1, sizeof(Node));
+            np -> kind = ND_FUNCCALL;
+            char *func = calloc(1, tp -> len + 1);
+            np -> funcname = strncpy(func, tp -> str, tp -> len);
+            expect(")");
+            return np;
+        }
         np = new_node_lvar(tp);
         return np;
     }
