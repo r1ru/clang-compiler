@@ -39,11 +39,12 @@ void gen_expr(Node* np){
             /* 引数があれば */
             if(np -> args){
                 int i;
-                for(i=0; i < np -> args -> len; i++){
-                    gen_expr(np -> args -> data[i]); // 引数を生成
+                for(i= np -> args -> len - 1; 0 <= i; i--){
+                    gen_expr(np -> args -> data[i]); // 引数を逆順にスタックに積む。こうすると6つ以上の引数をとる関数呼び出を実現するのが簡単になる。
                 }
-                for(i = np -> args -> len -1; 0 <= i; i--){
-                    fprintf(STREAM, "\tpop %s\n", argreg[i]); // レジスタにストア(順番に注意)
+                // x86-64では先頭から6つの引数までをレジスタで渡す。
+                for(i = 0; i < 6; i++){
+                    fprintf(STREAM, "\tpop %s\n", argreg[i]); // レジスタにストア(前から順番に。)
                 }
             }
             fprintf(STREAM, "\tcall %s\n", np -> funcname);
@@ -166,7 +167,6 @@ void gen_stmt(Node* np){
         case ND_BLOCK:
             for(unsigned int i = 0; i < np -> vec -> len; i++){
                 gen_stmt(np -> vec -> data[i]);
-                fprintf(STREAM, "\tpop rax\n");
             }
             return;
 
@@ -191,10 +191,10 @@ void codegen(void){
     /* 先頭の文からコード生成 */
     for( int i = 0; code[i]; i++){
         gen_stmt(code[i]);
-        fprintf(STREAM, "\tpop rax\n"); /* 式の評価結果がスタックに積まれているはず。*/
     }
 
     /* エピローグ */
+    fprintf(STREAM, "\tpop rax\n"); /* 式の評価結果がスタックに積まれているはず。*/
     fprintf(STREAM, "\tmov rsp, rbp\n");
     fprintf(STREAM, "\tpop rbp\n");
     fprintf(STREAM, "\tret\n"); /* 最後の式の評価結果が返り値になる。*/
