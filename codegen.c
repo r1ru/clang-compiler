@@ -1,6 +1,7 @@
 #include "9cc.h"
 
 static unsigned int llabel_index; // ローカルラベル用のインデックス
+static char* argreg[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 
 /* ローカル変数のアドレスを計算してスタックにpush */
 void gen_addr(Node *np) {
@@ -35,6 +36,16 @@ void gen_expr(Node* np){
             return;
         
         case ND_FUNCCALL:
+            /* 引数があれば */
+            if(np -> args){
+                int i;
+                for(i=0; i < np -> args -> len; i++){
+                    gen_expr(np -> args -> data[i]); // 引数を生成
+                }
+                for(i = np -> args -> len -1; 0 <= i; i--){
+                    fprintf(STREAM, "\tpop %s\n", argreg[i]); // レジスタにストア(順番に注意)
+                }
+            }
             fprintf(STREAM, "\tcall %s\n", np -> funcname);
             fprintf(STREAM, "\tpush rax\n"); // 返り値をスタックにpush
             return;
@@ -187,5 +198,5 @@ void codegen(void){
     fprintf(STREAM, "\tmov rsp, rbp\n");
     fprintf(STREAM, "\tpop rbp\n");
     fprintf(STREAM, "\tret\n"); /* 最後の式の評価結果が返り値になる。*/
-    
+
 }

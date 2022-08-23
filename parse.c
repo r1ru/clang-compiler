@@ -125,7 +125,7 @@ void tokenize(void){
 
          /* 一文字operatorの場合。
         strchrは第一引数で渡された検索対象から第二引数の文字を探してあればその文字へのポインターを、なければNULLを返す。*/
-        if(strchr("+-*/()<>;={}", *p)){
+        if(strchr("+-*/()<>;={},", *p)){
             cur = new_token(TK_RESERVED, cur, p, 1);
             display_token(cur);
             p++;
@@ -520,7 +520,10 @@ static Node* unary(void){
     }
 }
 
-/* primary = num | ident ("(" ")")? | "(" expr ")" */
+/* primary  = num 
+            | ident ("(" (expr ("," expr)* )? ")" ) ? 
+            | "(" expr ")" */
+
 static Node* primary(void){
     Node* np;
     Token* tp;
@@ -541,8 +544,16 @@ static Node* primary(void){
             np -> kind = ND_FUNCCALL;
             char *func = calloc(1, tp -> len + 1); // null終端するため+1してる。
             np -> funcname = strncpy(func, tp -> str, tp -> len);
+
+            /* 引数がある場合 */
+            if(!is_equal(")")){
+                np -> args = new_vec();
+                do{
+                    vec_push(np->args, expr());
+                }while(consume(TK_RESERVED, ","));
+            }
             expect(")");
-            return np;
+            return np;   
         }
         np = new_node_lvar(tp);
         return np;

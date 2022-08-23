@@ -84,6 +84,7 @@ struct Node{
     Node* body;
 
     char* funcname; // function name
+    Vector* args; // argments;
 
     Vector* vec; // for compound statement
     int val; // ND_NUM用
