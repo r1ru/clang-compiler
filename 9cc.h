@@ -45,6 +45,7 @@ struct Token{
 };
 
 typedef enum{
+    ND_EXPR_STMT, // expression statement
     ND_ADD,
     ND_SUB,
     ND_MUL,
@@ -70,7 +71,7 @@ struct Node{
     NodeKind kind;
     Node *lhs; // left hand side
     Node *rhs; // right hand side
-    Node* expr; // "return" expr
+    Node* expr; // "return" expr or expression statement
     /*  "if" (cond) then; "else" els;  
         "for" (init; cond; inc) body
         "while" (cond) body
@@ -97,6 +98,6 @@ void error(char *fmt, ...);
 void tokenize(void);
 void program(void);
 
-void gen(Node* np);
+void codegen(void);
 
 #endif

@@ -355,8 +355,8 @@ void program(void){
         | "{" stmt* "}"
         | "return" expr ";" 
         | "if" "(" expr ")" stmt ("else" stmt)?
-        | "while" "(" expr ")" stmt*
-        | "for" "(" expr? ";" expr? ";" expr? ")" stmt*/
+        | "while" "(" expr ")" stmt
+        | "for" "(" expr? ";" expr? ";" expr? ")" stmt */
 static Node* stmt(void){
     Node* np;
 
@@ -429,7 +429,9 @@ static Node* stmt(void){
     }
 
     /* expr ";" */
-    np = expr();
+    np = calloc(1, sizeof(Node));
+    np -> kind = ND_EXPR_STMT;
+    np -> expr = expr();
     expect(";");
     return np;
 }
@@ -533,10 +535,11 @@ static Node* primary(void){
     /* 識別子トークンの場合 */
     tp = consume_ident();
     if(tp){
+        /* ()が続くなら関数呼び出し */
         if(consume(TK_RESERVED, "(")){
             np = calloc(1, sizeof(Node));
             np -> kind = ND_FUNCCALL;
-            char *func = calloc(1, tp -> len + 1);
+            char *func = calloc(1, tp -> len + 1); // null終端するため+1してる。
             np -> funcname = strncpy(func, tp -> str, tp -> len);
             expect(")");
             return np;
