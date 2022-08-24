@@ -1,6 +1,6 @@
 #include "9cc.h"
 
-char* input;
+static char* input;
 
 static Token *token;
 
@@ -76,12 +76,12 @@ static bool startswith(char* p1, char* p2){
 }
 
 /* 入力文字列をトークナイズしてそれを返す */
-void tokenize(void){
+void tokenize(char* p){
     Token head; /* これは無駄になるがスタック領域なのでオーバーヘッドは0に等しい */
     Token* cur = &head;
     char *q;
 
-    char *p = input;
+    input = p;
 
     while(*p){
         /* is~関数は偽のときに0を、真の時に0以外を返す。*/
@@ -180,13 +180,8 @@ void tokenize(void){
     cur = new_token(TK_EOF, cur, p, 0);
     //display_token(cur);
     
-    /* tokenの先頭をセット */
+    /* トークンの先頭へのポインタをセット */
     token = head.next;
-}
-
-/* トークンを読み飛ばす */
-void skip_token(void){
-    token = token -> next;
 }
 
 /* TK_RESERVED用。トークンが期待した記号のときは真を返す。それ以外のときは偽を返す。*/

@@ -15,11 +15,8 @@ int main(int argc, char* argv[]){
         return 1;
     }
 
-    /* 入力を保存 */
-    input = argv[1];
-
     /* tokenize */
-    tokenize();
+    tokenize(argv[1]);
 
     /* 構文解析 */
     program();

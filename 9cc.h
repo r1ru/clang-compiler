@@ -48,16 +48,13 @@ struct Token{
     int len; // トークンの長さ
 };
 
-extern char* input;
-
-void skip_token(void);
 bool is_equal(char* op);
 bool consume(TokenKind kind, char* op);
 Token* consume_ident(void);
 void expect(char* op);
 int expect_number(void);
 bool at_eof(void);
-void tokenize(void);
+void tokenize(char* p);
 
 /* parse.c */
 typedef struct LVar LVar;

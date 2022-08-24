@@ -96,11 +96,10 @@ static Node* stmt(void){
         np -> kind = ND_BLOCK;
         np -> vec = new_vec();
 
-        while(!is_equal("}")){
+        while(!consume(TK_RESERVED, "}")){
             vec_push(np -> vec, stmt());
         }
         
-        skip_token();
         return np;
     }
 
