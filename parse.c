@@ -2,7 +2,7 @@
 
 Function* program; 
 
-static Function *current_fp; // 現在parseしている関数へのポインタ。
+static Function* current_fp; // 現在parseしている関数へのポインタ。
 
 /* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */
 static LVar *find_lvar(Token *tp) {

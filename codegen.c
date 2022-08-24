@@ -1,5 +1,6 @@
 #include "9cc.h"
 
+static Function* current_fp; // 現在コードを生成している関数へのポインタ
 static unsigned int llabel_index; // ローカルラベル用のインデックス
 static char* argreg[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 
@@ -118,33 +119,31 @@ static void gen_stmt(Node* np){
     
         case ND_RET:
             gen_expr(np -> expr);
-            fprintf(STREAM, "\tmov rsp, rbp\n");
-            fprintf(STREAM, "\tpop rbp\n");
-            fprintf(STREAM, "\tret\n"); /* return の右に指定された式の値が返り値になる。*/
+            fprintf(STREAM, "\tjmp .L.end.%s\n", current_fp -> name);
             return;
 
         case ND_IF:
             gen_expr(np -> cond);
             fprintf(STREAM, "\tcmp rax, 1\n");
-            fprintf(STREAM, "\tjne .L%u\n", llabel_index); // 条件式が偽の時はelseに指定されているコードに飛ぶ
+            fprintf(STREAM, "\tjne .L.%u\n", llabel_index); // 条件式が偽の時はelseに指定されているコードに飛ぶ
             gen_stmt(np -> then); // 条件式が真の時に実行される。
-            fprintf(STREAM, "\tjmp .Lend\n");
-            fprintf(STREAM, ".L%u:\n", llabel_index);
+            fprintf(STREAM, "\tjmp .L.end.%u\n", llabel_index);
+            fprintf(STREAM, ".L.%u:\n", llabel_index);
             if(np -> els){
                 gen_stmt(np -> els); // 条件式が偽の時に実行される。
             }
-            fprintf(STREAM, ".Lend:\n");
+            fprintf(STREAM, ".L.end.%u:\n", llabel_index);
             llabel_index++; // インデックスを更新
             return;
 
         case ND_WHILE:
-            fprintf(STREAM, ".L%u:\n", llabel_index);
+            fprintf(STREAM, ".L.%u:\n", llabel_index);
             gen_expr(np -> cond);
             fprintf(STREAM, "\tcmp rax, 1\n");
-            fprintf(STREAM, "\tjne .Lend\n"); // 条件式が偽の時は終了
+            fprintf(STREAM, "\tjne .L.end.%u\n", llabel_index); // 条件式が偽の時は終了
             gen_stmt(np -> body); // 条件式が真の時に実行される。
-            fprintf(STREAM, "\tjmp .L%u\n", llabel_index); // 条件式の評価に戻る
-            fprintf(STREAM, ".Lend:\n");
+            fprintf(STREAM, "\tjmp .L.%u\n", llabel_index); // 条件式の評価に戻る
+            fprintf(STREAM, ".L.end.%u:\n", llabel_index);
             llabel_index++; // インデックスを更新
             return;
 
@@ -152,19 +151,19 @@ static void gen_stmt(Node* np){
             if(np -> init){
                 gen_expr(np -> init);
             }
-            fprintf(STREAM, ".L%u:\n", llabel_index);
+            fprintf(STREAM, ".L.%u:\n", llabel_index);
             if(np -> cond){
                 gen_expr(np -> cond);
                 fprintf(STREAM, "\tcmp rax, 1\n");
-                fprintf(STREAM, "\tjne .Lend\n"); // 条件式が偽の時は終了
+                fprintf(STREAM, "\tjne .L.end.%u\n", llabel_index); // 条件式が偽の時は終了
 
             }
             gen_stmt(np -> body); // bodyは必ずあることが期待されている。
             if(np -> inc){
                 gen_expr(np -> inc);
             }
-            fprintf(STREAM, "\tjmp .L%u\n", llabel_index); // 条件式の評価に戻る
-            fprintf(STREAM, ".Lend:\n");
+            fprintf(STREAM, "\tjmp .L.%u\n", llabel_index); // 条件式の評価に戻る
+            fprintf(STREAM, ".L.end.%u:\n", llabel_index);
             llabel_index++; // インデックスを更新
             return;
         
@@ -181,7 +180,9 @@ static void gen_stmt(Node* np){
 }
 
 void codegen(void){
-    for (Function *fn = program; fn; fn = fn->next) {
+    for (Function *fp = program; fp; fp = fp->next) {
+        current_fp = fp;
+
         /* アセンブリの前半を出力 */
         fprintf(STREAM, ".intel_syntax noprefix\n");
         fprintf(STREAM, ".global main\n");
@@ -190,16 +191,17 @@ void codegen(void){
         /* プロローグ。 */
         fprintf(STREAM, "\tpush rbp\n");
         fprintf(STREAM, "\tmov rbp, rsp\n");
-        if(fn -> stacksiz != 0){
-            fprintf(STREAM, "\tsub rsp, %d\n", fn -> stacksiz);
+        if(fp -> stacksiz != 0){
+            fprintf(STREAM, "\tsub rsp, %d\n", fp -> stacksiz);
         }
 
         /* コード生成 */
-        for(int i = 0; i < fn -> body -> len; i++){
-            gen_stmt(fn -> body -> data[i]);
+        for(int i = 0; i < fp -> body -> len; i++){
+            gen_stmt(fp -> body -> data[i]);
         }
 
         /* エピローグ */
+        fprintf(STREAM, ".L.end.%s:\n", fp -> name); // このラベルは関数ごと。
         fprintf(STREAM, "\tmov rsp, rbp\n");
         fprintf(STREAM, "\tpop rbp\n");
         fprintf(STREAM, "\tret\n"); /* 最後の式の評価結果が返り値になる。*/   
