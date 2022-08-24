@@ -338,6 +338,7 @@ static Node* add(void);
 static Node* mul(void);
 static Node* unary(void);
 static Node* primary(void);
+static Node* funcall(Token* tp);
 
 /* program = stmt* */
 void program(void){
@@ -521,9 +522,8 @@ static Node* unary(void){
 }
 
 /* primary  = num 
-            | ident ("(" (expr ("," expr)* )? ")" ) ? 
+            | ident func-args?
             | "(" expr ")" */
-
 static Node* primary(void){
     Node* np;
     Token* tp;
@@ -540,20 +540,7 @@ static Node* primary(void){
     if(tp){
         /* ()が続くなら関数呼び出し */
         if(consume(TK_RESERVED, "(")){
-            np = calloc(1, sizeof(Node));
-            np -> kind = ND_FUNCCALL;
-            char *func = calloc(1, tp -> len + 1); // null終端するため+1してる。
-            np -> funcname = strncpy(func, tp -> str, tp -> len);
-
-            /* 引数がある場合 */
-            if(!is_equal(")")){
-                np -> args = new_vec();
-                do{
-                    vec_push(np->args, expr());
-                }while(consume(TK_RESERVED, ","));
-            }
-            expect(")");
-            return np;   
+            return funcall(tp);
         }
         np = new_node_lvar(tp);
         return np;
@@ -561,4 +548,22 @@ static Node* primary(void){
 
     /* そうでなければ数値のはず */
     return new_node_num(expect_number());
+}
+
+/* funcall = ident "(" (assign ("," assign)*)? ")" */
+static Node* funcall(Token* tp) {
+    Node* np = calloc(1, sizeof(Node));
+    np -> kind = ND_FUNCCALL;
+    char* funcname = calloc(1, tp -> len + 1);
+    np -> funcname = strncpy(funcname, tp -> str, tp -> len);
+
+    /* 引数がある場合 */
+    if(!is_equal(")")){
+        np -> args = new_vec();
+        do{
+            vec_push(np->args, expr());
+        }while(consume(TK_RESERVED, ","));
+    }
+    expect(")");
+    return np;   
 }
