@@ -1,17 +1,18 @@
 #include "9cc.h"
 
-static LVar *locals; // ローカル変数の単方向リスト 
-Node* code[100]; // 文は最大で99まで
+Function* program; 
+
+static Function *current_fp; // 現在parseしている関数へのポインタ。
 
 /* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */
 static LVar *find_lvar(Token *tp) {
-  for (LVar *lvar = locals; lvar; lvar = lvar->next){
-    /* memcmpは一致したら0を返す。startswithを使ってもいいかも? */
-    if (lvar -> len == tp -> len && !memcmp(lvar -> name, tp -> str, lvar -> len)){
-         return lvar;   
+    for (LVar *lvar = current_fp -> locals; lvar; lvar = lvar->next){
+        /* memcmpは一致したら0を返す。startswithを使ってもいいかも? */
+        if (lvar -> len == tp -> len && !memcmp(lvar -> name, tp -> str, lvar -> len)){
+            return lvar;   
+        }
     }
-  }
-  return NULL;
+    return NULL;
 }
 
 /* 変数名へのポインタを返す。strndupと同じ動作。 */
@@ -39,14 +40,11 @@ static Node* new_node_num(int val){
 
 /* ND_LVARを作成 */
 static Node* new_node_lvar(Token* tp){
-    Node *np;
-    LVar* lvar;
-
-    np = calloc(1, sizeof(Node));
+    Node* np = calloc(1, sizeof(Node));
     np -> kind = ND_LVAR;
 
-     /* ローカル変数が既に登録されているか検索 */
-    lvar = find_lvar(tp);
+    /* ローカル変数が既に登録されているか検索 */
+    LVar* lvar = find_lvar(tp);
     /* されているならoffsetはそれを使用 */
     if(lvar){
         np -> offset = lvar -> offset; 
@@ -54,17 +52,19 @@ static Node* new_node_lvar(Token* tp){
     /* されていなければリストに登録 */
     else{
         lvar = calloc(1, sizeof(LVar));
-        lvar -> next = locals;
+        lvar -> next = current_fp -> locals;
         lvar -> name = tp -> str;
         lvar -> len = tp -> len;
-        lvar -> offset = locals -> offset + 8; 
+        lvar -> offset = current_fp -> stacksiz + 8;
         np -> offset = lvar -> offset;
-        locals = lvar;
+        current_fp -> stacksiz += 8;
+        current_fp -> locals = lvar;
     }
     return np;
 }
 
-void program(void);
+void parse(void);
+Function* function(void);
 static Node* stmt(void);
 static Node* expr(void);
 static Node* assign(void);
@@ -76,16 +76,33 @@ static Node* unary(void);
 static Node* primary(void);
 static Node* funcall(Token* tp);
 
-/* program = stmt* */
-void program(void){
-    int i = 0;
-    locals = calloc(1, sizeof(LVar)); /* これをしないとnew_node_lvarのlocals->nextでSegmentation Faultがでる。
-                                        定義のみだとlocalsはNULLなので。*/
+/* program = function-definition* */
+void parse(void){
+    Function head = {};
+    Function* cur = &head;
     while(!at_eof()){
-        code[i] = stmt();
-        i++;
+        cur = cur -> next = function();
     }
-    code[i] = NULL; /* 終了をマーク */
+    program = head.next;
+}
+
+/* function-definition = ident "(" ")" "{" stmt* "}" */
+Function* function(void){
+    Token* tp = consume_ident();
+    if(!tp){
+        error_at(tp -> str, "identifier expected");
+    }
+    expect("(");
+    expect(")");
+    expect("{");
+    Function* fp = calloc(1, sizeof(Function));
+    fp -> name = get_ident(tp);
+    fp -> body = new_vec();
+    current_fp = fp;
+    while(!consume(TK_RESERVED, "}")){
+        vec_push(fp -> body, stmt());
+    }
+    return fp;    
 }
 
 /* stmt = expr ";" 

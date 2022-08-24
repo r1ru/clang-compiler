@@ -19,7 +19,7 @@ int main(int argc, char* argv[]){
     tokenize(argv[1]);
 
     /* 構文解析 */
-    program();
+    parse();
 
     codegen();
 

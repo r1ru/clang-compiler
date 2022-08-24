@@ -5,7 +5,7 @@ static char* input;
 static Token *token;
 
 /* エラー表示用の関数 */
-static void error_at(char *loc, char *fmt, ...) {
+void error_at(char *loc, char *fmt, ...){
   va_list ap;
   va_start(ap, fmt);
   int pos = loc - input; // ポインタの引き算は要素数を返す。

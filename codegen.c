@@ -48,7 +48,7 @@ static void gen_expr(Node* np){
                     push();
                 }
                 // x86-64では先頭から6つの引数までをレジスタで渡す。
-                for(i = 0; i < 6; i++){
+                for(i = 0; i < np -> args -> len || 6 < i; i++){
                     pop(argreg[i]); // レジスタにストア(前から順番に。)
                 }
             }
@@ -181,25 +181,27 @@ static void gen_stmt(Node* np){
 }
 
 void codegen(void){
-    
-    /* アセンブリの前半を出力 */
-    fprintf(STREAM, ".intel_syntax noprefix\n");
-    fprintf(STREAM, ".global main\n");
-    fprintf(STREAM, "main:\n");
+    for (Function *fn = program; fn; fn = fn->next) {
+        /* アセンブリの前半を出力 */
+        fprintf(STREAM, ".intel_syntax noprefix\n");
+        fprintf(STREAM, ".global main\n");
+        fprintf(STREAM, "main:\n");
 
-    /* プロローグ。変数26個分の領域を確保する */
-    fprintf(STREAM, "\tpush rbp\n");
-    fprintf(STREAM, "\tmov rbp, rsp\n");
-    fprintf(STREAM, "\tsub rsp, 208\n"); /* 8 * 26 */
+        /* プロローグ。 */
+        fprintf(STREAM, "\tpush rbp\n");
+        fprintf(STREAM, "\tmov rbp, rsp\n");
+        if(fn -> stacksiz != 0){
+            fprintf(STREAM, "\tsub rsp, %d\n", fn -> stacksiz);
+        }
 
-    /* 先頭の文からコード生成 */
-    for( int i = 0; code[i]; i++){
-        gen_stmt(code[i]);
+        /* コード生成 */
+        for(int i = 0; i < fn -> body -> len; i++){
+            gen_stmt(fn -> body -> data[i]);
+        }
+
+        /* エピローグ */
+        fprintf(STREAM, "\tmov rsp, rbp\n");
+        fprintf(STREAM, "\tpop rbp\n");
+        fprintf(STREAM, "\tret\n"); /* 最後の式の評価結果が返り値になる。*/   
     }
-
-    /* エピローグ */
-    fprintf(STREAM, "\tmov rsp, rbp\n");
-    fprintf(STREAM, "\tpop rbp\n");
-    fprintf(STREAM, "\tret\n"); /* 最後の式の評価結果が返り値になる。*/
-
 }

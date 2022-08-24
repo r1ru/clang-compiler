@@ -48,6 +48,7 @@ struct Token{
     int len; // トークンの長さ
 };
 
+void error_at(char *loc, char *fmt, ...);
 bool is_equal(char* op);
 bool consume(TokenKind kind, char* op);
 Token* consume_ident(void);
@@ -64,6 +65,16 @@ struct LVar {
   char *name; // 変数の名前
   int len;    // 名前の長さ
   int offset; // RBPからのオフセット
+};
+
+typedef struct Function Function;
+
+struct Function{
+    Function* next;
+    char* name;
+    Vector* body;
+    LVar* locals; // ローカル変数の単方向リストへのポインタ
+    int stacksiz;
 };
 
 typedef enum{
@@ -113,9 +124,9 @@ struct Node{
     int offset; // ND_LVAL用
 };
 
-extern Node* code[100]; 
+extern Function* program; 
 
-void program(void);
+void parse(void);
 
 /* codegen.c */
 void codegen(void);
