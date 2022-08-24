@@ -19,7 +19,7 @@ static void gen_addr(Node *np) {
 }
 
 /* 式の評価結果はraxレジスタに格納される。 */
-void gen_expr(Node* np){
+static void gen_expr(Node* np){
     switch(np -> kind){
         case ND_NUM:
             fprintf(STREAM, "\tmov rax, %d\n", np -> val); /* ND_NUMなら入力が一つの数値だったということ。*/
@@ -113,7 +113,7 @@ void gen_expr(Node* np){
     }    
 }
 
-void gen_stmt(Node* np){
+static void gen_stmt(Node* np){
     switch(np -> kind){
     
         case ND_RET:

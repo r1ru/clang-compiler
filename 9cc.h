@@ -11,19 +11,23 @@
 #define STREAM stdout
 #define ERROR stderr
 
+/* main.c */
+extern FILE* debug;
+
+/* utils.c */
 typedef struct{
     void** data; // 汎用
     unsigned int capacity;
     unsigned int len;
 }Vector;
 
-// defined in utils.c
+void error(char *fmt, ...);
 Vector* new_vec(void);
 void vec_push(Vector* vp, void* elem);
 
+/* tokenize.c */
 typedef struct Token Token;
 
-/* 字句解析用 */
 typedef enum{
     TK_RESERVED,
     TK_IDENT, // 識別子
@@ -42,6 +46,27 @@ struct Token{
     int val;
     char* str;
     int len; // トークンの長さ
+};
+
+extern char* input;
+
+void skip_token(void);
+bool is_equal(char* op);
+bool consume(TokenKind kind, char* op);
+Token* consume_ident(void);
+void expect(char* op);
+int expect_number(void);
+bool at_eof(void);
+void tokenize(void);
+
+/* parse.c */
+typedef struct LVar LVar;
+
+struct LVar {
+  LVar *next; // 次の変数かNULL
+  char *name; // 変数の名前
+  int len;    // 名前の長さ
+  int offset; // RBPからのオフセット
 };
 
 typedef enum{
@@ -91,14 +116,11 @@ struct Node{
     int offset; // ND_LVAL用
 };
 
-extern FILE* debug;
-extern char* input;
 extern Node* code[100]; 
 
-void error(char *fmt, ...);
-void tokenize(void);
 void program(void);
 
+/* codegen.c */
 void codegen(void);
 
 #endif

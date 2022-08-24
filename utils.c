@@ -1,5 +1,14 @@
 #include "9cc.h"
 
+/* エラー表示用の関数 */
+void error(char *fmt, ...){
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  fprintf(stderr, "\n");
+  exit(1);
+}
+
 Vector* new_vec(void){
     Vector* vp = malloc(sizeof(Vector));
     vp -> data = malloc(16 * sizeof(void*));
