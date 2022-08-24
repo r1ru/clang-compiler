@@ -14,6 +14,12 @@ static LVar *find_lvar(Token *tp) {
   return NULL;
 }
 
+/* 変数名へのポインタを返す。strndupと同じ動作。 */
+static char* get_ident(Token* tp){
+    char* p = calloc(1, tp -> len + 1); // null終端するため。
+    return strncpy(p, tp -> str, tp -> len);
+}
+
 /* 新しいnodeを作成 */
 static Node* new_node(NodeKind kind, Node* lhs, Node* rhs){
     Node* np = calloc(1, sizeof(Node));
@@ -283,8 +289,7 @@ static Node* primary(void){
 static Node* funcall(Token* tp) {
     Node* np = calloc(1, sizeof(Node));
     np -> kind = ND_FUNCCALL;
-    char* funcname = calloc(1, tp -> len + 1);
-    np -> funcname = strncpy(funcname, tp -> str, tp -> len);
+    np -> funcname = get_ident(tp);
 
     /* 引数がある場合 */
     if(!is_equal(")")){
