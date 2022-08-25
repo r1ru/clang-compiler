@@ -1,8 +1,65 @@
 #include "9cc.h"
 
+Token *token;
 Function* program; 
 
 static Function* current_fp; // 現在parseしている関数へのポインタ。
+
+/* TK_RESERVED用。トークンが期待した記号のときは真を返す。それ以外のときは偽を返す。*/
+static bool is_equal(char* op){
+    if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
+        return false;
+    return true;
+}
+
+/* トークンが期待した種類の記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
+static bool consume(TokenKind kind, char* op){
+    switch(kind){
+        /* TK_RESERVEDの場合は文字列が一致するかチェック */
+        case TK_RESERVED:
+            if(strlen(op) != token -> len || memcmp(op, token -> str, token -> len)){
+                return false;
+            }
+        /* それ以外の場合はkindが一致するか調べるのみ */
+        default:
+            if(kind != token -> kind){
+                return false;
+            }
+        token = token -> next;
+        return true;
+    }
+}
+
+/* TK_IDENT用。トークンが識別子のときはトークンを読み進めてTK_IDENTへのポインタを返す。それ以外のときはNULLを返す。*/
+static Token* consume_ident(void){
+    if(token -> kind != TK_IDENT) {
+       return NULL;
+    }
+    Token* tp = token;
+    token = token -> next;
+    return tp;
+}
+
+/* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
+static void expect(char* op){
+    if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
+        error_at(token->str, "%sではありません\n", op);
+    token = token -> next;
+}
+
+/* TK_NUM用。トークンが数値の時にトークンを読み進めて数値を返す。それ以外の時エラー */
+static int expect_number(void){
+    if(token -> kind != TK_NUM)
+        error_at(token->str, "数ではありません\n");
+    int val = token -> val;
+    token = token -> next;
+    return val;
+}
+
+/* TK_EOF用。トークンがEOFかどうかを返す。*/
+static bool at_eof(void){
+    return token -> kind == TK_EOF;
+}
 
 /* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */
 static Obj *find_lvar(Token *tp) {

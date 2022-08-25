@@ -49,12 +49,6 @@ struct Token{
 };
 
 void error_at(char *loc, char *fmt, ...);
-bool is_equal(char* op);
-bool consume(TokenKind kind, char* op);
-Token* consume_ident(void);
-void expect(char* op);
-int expect_number(void);
-bool at_eof(void);
 void tokenize(char* p);
 
 /* parse.c */
@@ -124,6 +118,7 @@ struct Node{
     int offset; // ND_LVAL用
 };
 
+extern Token *token;
 extern Function* program; 
 
 void parse(void);
