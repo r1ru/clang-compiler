@@ -5,8 +5,8 @@ Function* program;
 static Function* current_fp; // 現在parseしている関数へのポインタ。
 
 /* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */
-static LVar *find_lvar(Token *tp) {
-    for (LVar *lvar = current_fp -> locals; lvar; lvar = lvar->next){
+static Obj *find_lvar(Token *tp) {
+    for (Obj *lvar = current_fp -> locals; lvar; lvar = lvar->next){
         /* memcmpは一致したら0を返す。startswithを使ってもいいかも? */
         if (lvar -> len == tp -> len && !memcmp(lvar -> name, tp -> str, lvar -> len)){
             return lvar;   
@@ -44,14 +44,14 @@ static Node* new_node_lvar(Token* tp){
     np -> kind = ND_LVAR;
 
     /* ローカル変数が既に登録されているか検索 */
-    LVar* lvar = find_lvar(tp);
+    Obj* lvar = find_lvar(tp);
     /* されているならoffsetはそれを使用 */
     if(lvar){
         np -> offset = lvar -> offset; 
     }
     /* されていなければリストに登録 */
     else{
-        lvar = calloc(1, sizeof(LVar));
+        lvar = calloc(1, sizeof(Obj));
         lvar -> next = current_fp -> locals;
         lvar -> name = tp -> str;
         lvar -> len = tp -> len;

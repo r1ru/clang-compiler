@@ -58,10 +58,10 @@ bool at_eof(void);
 void tokenize(char* p);
 
 /* parse.c */
-typedef struct LVar LVar;
+typedef struct Obj Obj;
 
-struct LVar {
-  LVar *next; // 次の変数かNULL
+struct Obj {
+  Obj *next; // 次の変数かNULL
   char *name; // 変数の名前
   int len;    // 名前の長さ
   int offset; // RBPからのオフセット
@@ -71,9 +71,9 @@ typedef struct Function Function;
 
 struct Function{
     Function* next;
-    char* name;
+    char* name; 
     Vector* body;
-    LVar* locals; // ローカル変数の単方向リストへのポインタ
+    Obj* locals; // ローカル変数の単方向リストへのポインタ
     int stacksiz;
 };
 
