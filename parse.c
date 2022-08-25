@@ -5,9 +5,14 @@ Function* program;
 
 static Function* current_fp; // 現在parseしている関数へのポインタ。
 
+/* 次のトークンを読む。(tokenを更新するのはこの関数のみ) */
+static void next_token(void){
+    token = token -> next;
+}
+
 /* TK_RESERVED用。トークンが期待した記号のときは真を返す。それ以外のときは偽を返す。*/
 static bool is_equal(char* op){
-    if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
+    if(token -> kind != TK_RESERVED || strlen(op) != token -> len || strncmp(op, token -> str, token -> len))
         return false;
     return true;
 }
@@ -17,7 +22,7 @@ static bool consume(TokenKind kind, char* op){
     switch(kind){
         /* TK_RESERVEDの場合は文字列が一致するかチェック */
         case TK_RESERVED:
-            if(strlen(op) != token -> len || memcmp(op, token -> str, token -> len)){
+            if(strlen(op) != token -> len || strncmp(op, token -> str, token -> len)){
                 return false;
             }
         /* それ以外の場合はkindが一致するか調べるのみ */
@@ -25,35 +30,51 @@ static bool consume(TokenKind kind, char* op){
             if(kind != token -> kind){
                 return false;
             }
-        token = token -> next;
+        next_token();
         return true;
     }
 }
 
-/* TK_IDENT用。トークンが識別子のときはトークンを読み進めてTK_IDENTへのポインタを返す。それ以外のときはNULLを返す。*/
+/* トークンの名前をバッファに格納してポインタを返す。strndupと同じ動作。 */
+static char* get_ident(Token* tp){
+    char* name = calloc(1, tp -> len + 1); // null終端するため。
+    return strncpy(name, tp -> str, tp -> len);
+}
+
+/* TK_IDENT用。トークンが識別子のときはトークンを読み進めてトークンへのポインタを返す。それ以外のときはNULLを返す。*/
 static Token* consume_ident(void){
     if(token -> kind != TK_IDENT) {
        return NULL;
     }
     Token* tp = token;
-    token = token -> next;
+    next_token();
     return tp;
 }
 
 /* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
 static void expect(char* op){
-    if(token -> kind != TK_RESERVED ||strlen(op) != token -> len || memcmp(op, token -> str, token -> len))
+    if(token -> kind != TK_RESERVED || strlen(op) != token -> len || strncmp(op, token -> str, token -> len))
         error_at(token->str, "%sではありません\n", op);
-    token = token -> next;
+    next_token();
 }
 
 /* TK_NUM用。トークンが数値の時にトークンを読み進めて数値を返す。それ以外の時エラー */
 static int expect_number(void){
     if(token -> kind != TK_NUM)
-        error_at(token->str, "数ではありません\n");
+        error_at(token -> str, "数ではありません\n");
     int val = token -> val;
-    token = token -> next;
+    next_token();
     return val;
+}
+
+/* TK_IDENT用。トークンが識別子の時はトークンを読み進めて名前を返す。それ以外の時エラー */
+static char* expect_ident(void){
+    if(token -> kind != TK_IDENT){
+        error_at(token -> str, "識別子ではありません。\n");
+    }
+    char* name = get_ident(token);
+    next_token();
+    return name;
 }
 
 /* TK_EOF用。トークンがEOFかどうかを返す。*/
@@ -62,61 +83,68 @@ static bool at_eof(void){
 }
 
 /* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */
-static Obj *find_lvar(Token *tp) {
+static Obj *find_lvar(Token* tp) {
     for (Obj *lvar = current_fp -> locals; lvar; lvar = lvar->next){
-        /* memcmpは一致したら0を返す。startswithを使ってもいいかも? */
-        if (lvar -> len == tp -> len && !memcmp(lvar -> name, tp -> str, lvar -> len)){
+        if(strlen(lvar -> name) == tp -> len && !strncmp(lvar -> name, tp -> str, tp -> len)){
             return lvar;   
         }
     }
     return NULL;
 }
 
-/* 変数名へのポインタを返す。strndupと同じ動作。 */
-static char* get_ident(Token* tp){
-    char* p = calloc(1, tp -> len + 1); // null終端するため。
-    return strncpy(p, tp -> str, tp -> len);
+/* 新しい変数を作成してリストに登録 */
+static Obj* new_lvar(char* name){
+    Obj* lvar = calloc(1, sizeof(Obj));
+    lvar -> next = current_fp -> locals;
+    lvar -> name = name;
+    current_fp -> stacksiz += 8;
+    lvar -> offset = current_fp -> stacksiz; // TOOD: ここをもう少し分かりやすく。
+    current_fp -> locals = lvar;
+    return lvar;
+}
+
+/* 新しい関数を作成 */
+static Function* new_func(char* name){
+    Function* fp = calloc(1, sizeof(Function));
+    fp -> name = name;
+    fp -> body = new_vec();
+    current_fp = fp;
+    return fp;
 }
 
 /* 新しいnodeを作成 */
-static Node* new_node(NodeKind kind, Node* lhs, Node* rhs){
+static Node* new_node(NodeKind kind){
     Node* np = calloc(1, sizeof(Node));
     np -> kind = kind;
+    return np;
+}
+
+/* 二項演算(binary operation)用 */
+static Node* new_binary(NodeKind kind, Node* lhs, Node* rhs){
+    Node* np = new_node(kind);
     np -> lhs = lhs;
     np -> rhs = rhs;
     return np;
 }
 
 /* ND_NUMを作成 */
-static Node* new_node_num(int val){
-    Node *np = calloc(1, sizeof(Node));
-    np -> kind = ND_NUM;
+static Node* new_num_node(int val){
+    Node* np = new_node(ND_NUM);
     np -> val = val;
     return np;
 }
 
 /* ND_LVARを作成 */
-static Node* new_node_lvar(Token* tp){
-    Node* np = calloc(1, sizeof(Node));
-    np -> kind = ND_LVAR;
+static Node* new_lvar_node(Token* tp){
+    Node* np = new_node(ND_LVAR);
 
     /* ローカル変数が既に登録されているか検索 */
     Obj* lvar = find_lvar(tp);
-    /* されているならoffsetはそれを使用 */
-    if(lvar){
-        np -> offset = lvar -> offset; 
+    /* されてい無ければ作成してリストに登録 */
+    if(!lvar){
+        lvar = new_lvar(get_ident(tp));
     }
-    /* されていなければリストに登録 */
-    else{
-        lvar = calloc(1, sizeof(Obj));
-        lvar -> next = current_fp -> locals;
-        lvar -> name = tp -> str;
-        lvar -> len = tp -> len;
-        lvar -> offset = current_fp -> stacksiz + 8;
-        np -> offset = lvar -> offset;
-        current_fp -> stacksiz += 8;
-        current_fp -> locals = lvar;
-    }
+    np -> offset = lvar -> offset; 
     return np;
 }
 
@@ -145,17 +173,11 @@ void parse(void){
 
 /* function-definition = ident "(" ")" "{" stmt* "}" */
 Function* function(void){
-    Token* tp = consume_ident();
-    if(!tp){
-        error_at(tp -> str, "identifier expected");
-    }
+    char* name = expect_ident();
     expect("(");
     expect(")");
     expect("{");
-    Function* fp = calloc(1, sizeof(Function));
-    fp -> name = get_ident(tp);
-    fp -> body = new_vec();
-    current_fp = fp;
+    Function* fp = new_func(name);
     while(!consume(TK_RESERVED, "}")){
         vec_push(fp -> body, stmt());
     }
@@ -172,8 +194,7 @@ static Node* stmt(void){
     Node* np;
 
     if(consume(TK_RESERVED, "{")){
-        np = calloc(1, sizeof(Node));
-        np -> kind = ND_BLOCK;
+        np = new_node(ND_BLOCK);
         np -> vec = new_vec();
 
         while(!consume(TK_RESERVED, "}")){
@@ -185,8 +206,7 @@ static Node* stmt(void){
 
     /* "return" expr ";" */
     if(consume(TK_RET, NULL)){
-        np = calloc(1, sizeof(Node));
-        np -> kind = ND_RET;
+        np = new_node(ND_RET);
         np -> expr = expr();
         expect(";");
         return np;
@@ -195,8 +215,7 @@ static Node* stmt(void){
     /* "if" "(" expr ")" stmt ("else" stmt)? */
     if(consume(TK_IF, NULL)){
         expect("(");
-        np = calloc(1, sizeof(Node));
-        np -> kind = ND_IF;
+        np = new_node(ND_IF);
         np -> cond = expr();
         expect(")");
         np -> then = stmt();
@@ -209,8 +228,7 @@ static Node* stmt(void){
     /* "while" "(" expr ")" stmt */
     if(consume(TK_WHILE, NULL)){
         expect("(");
-        np = calloc(1, sizeof(Node));
-        np -> kind = ND_WHILE;
+        np = new_node(ND_WHILE);
         np -> cond = expr();
         expect(")");
         np -> body = stmt();
@@ -220,8 +238,7 @@ static Node* stmt(void){
     /* "for" "(" expr? ";" expr? ";" expr? ")" stmt */
     if(consume(TK_FOR, NULL)){
         expect("(");
-        np = calloc(1, sizeof(Node));
-        np -> kind = ND_FOR;
+        np = new_node(ND_FOR);
         if(!is_equal(";")){
             np -> init = expr();
         }
@@ -239,8 +256,7 @@ static Node* stmt(void){
     }
 
     /* expr ";" */
-    np = calloc(1, sizeof(Node));
-    np -> kind = ND_EXPR_STMT;
+    np = new_node(ND_EXPR_STMT);
     np -> expr = expr();
     expect(";");
     return np;
@@ -255,7 +271,7 @@ static Node* expr(void){
 static Node* assign(void){
     Node* np = equality();
     if(consume(TK_RESERVED, "="))
-        np = new_node(ND_ASSIGN, np, assign()); // 代入は式。
+        np = new_binary(ND_ASSIGN, np, assign()); // 代入は式。
     return np;
 }
 
@@ -264,9 +280,9 @@ static Node* equality(void){
     Node* np = relational();
     for(;;){
         if(consume(TK_RESERVED, "=="))
-            np = new_node(ND_EQ, np, relational());
+            np = new_binary(ND_EQ, np, relational());
         else if(consume(TK_RESERVED, "!="))
-            np = new_node(ND_NE, np, relational());
+            np = new_binary(ND_NE, np, relational());
         else 
             return np;
     }
@@ -277,13 +293,13 @@ static Node* relational(void){
     Node* np = add();
     for(;;){
         if(consume(TK_RESERVED, "<"))
-            np = new_node(ND_LT, np, add());
+            np = new_binary(ND_LT, np, add());
         else if(consume(TK_RESERVED, "<="))
-            np = new_node(ND_LE, np , add());
+            np = new_binary(ND_LE, np , add());
         else if(consume(TK_RESERVED, ">"))
-            np = new_node(ND_LT, add(), np); /* x > y は y < xと同じ。 */
+            np = new_binary(ND_LT, add(), np); /* x > y は y < xと同じ。 */
         else if(consume(TK_RESERVED, ">="))
-            np = new_node(ND_LE, add(), np); /* x >= y は y <= xと同じ */
+            np = new_binary(ND_LE, add(), np); /* x >= y は y <= xと同じ */
         else 
             return np;
     }
@@ -294,9 +310,9 @@ static Node* add(void){
     Node* np = mul();
     for(;;){
         if(consume(TK_RESERVED, "+"))
-            np = new_node(ND_ADD, np, mul());
+            np = new_binary(ND_ADD, np, mul());
         else if(consume(TK_RESERVED, "-"))
-            np = new_node(ND_SUB, np, mul());
+            np = new_binary(ND_SUB, np, mul());
         else
             return np;
     }
@@ -307,9 +323,9 @@ static Node* mul(void){
     Node* np = unary();
     for(;;){
         if(consume(TK_RESERVED, "*"))
-            np = new_node(ND_MUL, np, unary());
+            np = new_binary(ND_MUL, np, unary());
         else if(consume(TK_RESERVED, "/"))
-            np = new_node(ND_DIV, np, unary());
+            np = new_binary(ND_DIV, np, unary());
         else 
             return np;
     }
@@ -323,7 +339,7 @@ static Node* unary(void){
     }
     /* -xは0 - xと解釈する。 */
     else if(consume(TK_RESERVED, "-")){
-        return new_node(ND_SUB, new_node_num(0), unary());
+        return new_binary(ND_SUB, new_num_node(0), unary());
     }
     else{
         return primary();
@@ -351,18 +367,17 @@ static Node* primary(void){
         if(consume(TK_RESERVED, "(")){
             return funcall(tp);
         }
-        np = new_node_lvar(tp);
+        np = new_lvar_node(tp);
         return np;
     }
 
     /* そうでなければ数値のはず */
-    return new_node_num(expect_number());
+    return new_num_node(expect_number());
 }
 
 /* funcall = ident "(" (assign ("," assign)*)? ")" */
 static Node* funcall(Token* tp) {
-    Node* np = calloc(1, sizeof(Node));
-    np -> kind = ND_FUNCCALL;
+    Node* np = new_node(ND_FUNCCALL);
     np -> funcname = get_ident(tp);
 
     /* 引数がある場合 */
