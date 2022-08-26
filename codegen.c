@@ -1,5 +1,7 @@
 #include "9cc.h"
 
+Function* program;
+
 static Function* current_fp; // 現在コードを生成している関数へのポインタ
 static unsigned int llabel_index; // ローカルラベル用のインデックス
 static char* argreg[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
@@ -56,7 +58,7 @@ static void gen_expr(Node* np){
             fprintf(STREAM, "\tcall %s\n", np -> funcname);
 
             if(np -> args && np -> args -> len > 6){
-                fprintf(STREAM, "\tsub rsp, %d\n", 8 * np -> args -> len - 6);
+                fprintf(STREAM, "\tsub rsp, %u\n", 8 * np -> args -> len - 6);
             }
             return;
     }
@@ -180,28 +182,35 @@ static void gen_stmt(Node* np){
 }
 
 void codegen(void){
+    fprintf(STREAM, ".intel_syntax noprefix\n");
     for (Function *fp = program; fp; fp = fp->next) {
         current_fp = fp;
 
         /* アセンブリの前半を出力 */
-        fprintf(STREAM, ".intel_syntax noprefix\n");
-        fprintf(STREAM, ".global main\n");
-        fprintf(STREAM, "main:\n");
+        fprintf(STREAM, ".global %s\n", current_fp -> name);
+        fprintf(STREAM, "%s:\n", current_fp -> name);
 
         /* プロローグ。 */
         fprintf(STREAM, "\tpush rbp\n");
         fprintf(STREAM, "\tmov rbp, rsp\n");
         if(fp -> stacksiz != 0){
-            fprintf(STREAM, "\tsub rsp, %d\n", fp -> stacksiz);
+            fprintf(STREAM, "\tsub rsp, %u\n", current_fp -> stacksiz);
+        }
+
+        int i;
+        /* パラメータをスタック領域にコピーする */
+        for(i = 0; i < current_fp -> num_params; i++){
+            Obj* lvar = current_fp -> locals -> data[i];
+            fprintf(STREAM, "\tmov [rbp - %d], %s\n", lvar -> offset, argreg[i]);
         }
 
         /* コード生成 */
-        for(int i = 0; i < fp -> body -> len; i++){
-            gen_stmt(fp -> body -> data[i]);
+        for(i = 0; i < current_fp -> body -> len; i++){
+            gen_stmt(current_fp -> body -> data[i]);
         }
 
         /* エピローグ */
-        fprintf(STREAM, ".L.end.%s:\n", fp -> name); // このラベルは関数ごと。
+        fprintf(STREAM, ".L.end.%s:\n", current_fp -> name); // このラベルは関数ごと。
         fprintf(STREAM, "\tmov rsp, rbp\n");
         fprintf(STREAM, "\tpop rbp\n");
         fprintf(STREAM, "\tret\n"); /* 最後の式の評価結果が返り値になる。*/   

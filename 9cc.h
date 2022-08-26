@@ -55,7 +55,6 @@ void tokenize(char* p);
 typedef struct Obj Obj;
 
 struct Obj {
-  Obj *next; // 次の変数かNULL
   char *name; // 変数の名前
   int offset; // RBPからのオフセット
 };
@@ -65,9 +64,10 @@ typedef struct Function Function;
 struct Function{
     Function* next;
     char* name; 
+    size_t num_params; // 仮引数の数
+    Vector* locals;
     Vector* body;
-    Obj* locals; // ローカル変数の単方向リストへのポインタ
-    int stacksiz;
+    unsigned int stacksiz;
 };
 
 typedef enum{
@@ -123,6 +123,8 @@ extern Function* program;
 void parse(void);
 
 /* codegen.c */
+extern Function* program;
+
 void codegen(void);
 
 #endif

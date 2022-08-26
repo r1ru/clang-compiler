@@ -1,7 +1,6 @@
 #include "9cc.h"
 
 Token *token;
-Function* program; 
 
 static Function* current_fp; // 現在parseしている関数へのポインタ。
 
@@ -84,9 +83,10 @@ static bool at_eof(void){
 
 /* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */
 static Obj *find_lvar(Token* tp) {
-    for (Obj *lvar = current_fp -> locals; lvar; lvar = lvar->next){
-        if(strlen(lvar -> name) == tp -> len && !strncmp(lvar -> name, tp -> str, tp -> len)){
-            return lvar;   
+    for(size_t i = 0; i < current_fp -> locals -> len; i++){
+        Obj* lvar = current_fp -> locals -> data[i];
+        if(strlen(lvar-> name) == tp -> len && !strncmp(lvar -> name, tp -> str, tp -> len)){
+            return lvar;
         }
     }
     return NULL;
@@ -95,11 +95,9 @@ static Obj *find_lvar(Token* tp) {
 /* 新しい変数を作成してリストに登録 */
 static Obj* new_lvar(char* name){
     Obj* lvar = calloc(1, sizeof(Obj));
-    lvar -> next = current_fp -> locals;
     lvar -> name = name;
     current_fp -> stacksiz += 8;
     lvar -> offset = current_fp -> stacksiz; // TOOD: ここをもう少し分かりやすく。
-    current_fp -> locals = lvar;
     return lvar;
 }
 
@@ -107,8 +105,8 @@ static Obj* new_lvar(char* name){
 static Function* new_func(char* name){
     Function* fp = calloc(1, sizeof(Function));
     fp -> name = name;
+    fp -> locals = new_vec();
     fp -> body = new_vec();
-    current_fp = fp;
     return fp;
 }
 
@@ -140,9 +138,10 @@ static Node* new_lvar_node(Token* tp){
 
     /* ローカル変数が既に登録されているか検索 */
     Obj* lvar = find_lvar(tp);
-    /* されてい無ければ作成してリストに登録 */
+    /* されていなければ作成してリストに登録 */
     if(!lvar){
         lvar = new_lvar(get_ident(tp));
+        vec_push(current_fp -> locals, lvar);
     }
     np -> offset = lvar -> offset; 
     return np;
@@ -171,13 +170,21 @@ void parse(void){
     program = head.next;
 }
 
-/* function-definition = ident "(" ")" "{" stmt* "}" */
+/* function-definition = ident "(" func-params? ")" "{" stmt* "}" */
 Function* function(void){
     char* name = expect_ident();
+    Function* fp = new_func(name);
+    current_fp = fp;
     expect("(");
+    /* 引数がある場合 */
+    if(!is_equal(")")){
+        do{ 
+            vec_push(current_fp -> locals, new_lvar(expect_ident()));
+            current_fp -> num_params++;
+        }while(consume(TK_RESERVED, ","));
+    }
     expect(")");
     expect("{");
-    Function* fp = new_func(name);
     while(!consume(TK_RESERVED, "}")){
         vec_push(fp -> body, stmt());
     }
@@ -347,7 +354,8 @@ static Node* unary(void){
 }
 
 /* primary  = num 
-            | ident func-args?
+            | ident
+            | funcall
             | "(" expr ")" */
 static Node* primary(void){
     Node* np;
@@ -375,7 +383,7 @@ static Node* primary(void){
     return new_num_node(expect_number());
 }
 
-/* funcall = ident "(" (assign ("," assign)*)? ")" */
+/* funcall = ident "(" func-args? ")" */
 static Node* funcall(Token* tp) {
     Node* np = new_node(ND_FUNCCALL);
     np -> funcname = get_ident(tp);
