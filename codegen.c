@@ -120,7 +120,7 @@ static void gen_stmt(Node* np){
     switch(np -> kind){
     
         case ND_RET:
-            gen_expr(np -> expr);
+            gen_expr(np -> rhs);
             fprintf(STREAM, "\tjmp .L.end.%s\n", current_fp -> name);
             return;
 
@@ -143,7 +143,7 @@ static void gen_stmt(Node* np){
             gen_expr(np -> cond);
             fprintf(STREAM, "\tcmp rax, 1\n");
             fprintf(STREAM, "\tjne .L.end.%u\n", llabel_index); // 条件式が偽の時は終了
-            gen_stmt(np -> body); // 条件式が真の時に実行される。
+            gen_stmt(np -> then); // 条件式が真の時に実行される。
             fprintf(STREAM, "\tjmp .L.%u\n", llabel_index); // 条件式の評価に戻る
             fprintf(STREAM, ".L.end.%u:\n", llabel_index);
             llabel_index++; // インデックスを更新
@@ -160,7 +160,7 @@ static void gen_stmt(Node* np){
                 fprintf(STREAM, "\tjne .L.end.%u\n", llabel_index); // 条件式が偽の時は終了
 
             }
-            gen_stmt(np -> body); // bodyは必ずあることが期待されている。
+            gen_stmt(np -> then); // thenは必ずあることが期待されている。
             if(np -> inc){
                 gen_expr(np -> inc);
             }
@@ -176,7 +176,7 @@ static void gen_stmt(Node* np){
             return;
 
         case ND_EXPR_STMT:
-            gen_expr(np -> expr);
+            gen_expr(np -> rhs);
             return;   
     }
 }

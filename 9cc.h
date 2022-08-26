@@ -97,17 +97,13 @@ struct Node{
     NodeKind kind;
     Node *lhs; // left hand side
     Node *rhs; // right hand side
-    Node* expr; // "return" expr or expression statement
-    /*  "if" (cond) then; "else" els;  
-        "for" (init; cond; inc) body
-        "while" (cond) body
-    */
+   
+   /* if while for statement */
     Node* cond; 
     Node* then; 
     Node* els; 
     Node* init; 
     Node* inc; 
-    Node* body;
 
     char* funcname; // function name
     Vector* args; // argments;

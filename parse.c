@@ -214,7 +214,7 @@ static Node* stmt(void){
     /* "return" expr ";" */
     if(consume(TK_RET, NULL)){
         np = new_node(ND_RET);
-        np -> expr = expr();
+        np -> rhs = expr();
         expect(";");
         return np;
     }
@@ -238,7 +238,7 @@ static Node* stmt(void){
         np = new_node(ND_WHILE);
         np -> cond = expr();
         expect(")");
-        np -> body = stmt();
+        np -> then = stmt();
         return np;
     }
 
@@ -258,13 +258,13 @@ static Node* stmt(void){
             np -> inc = expr();
         }
         expect(")");
-        np -> body = stmt(); // bodyは必ず存在することが期待されている。
+        np -> then = stmt();
         return np;
     }
 
     /* expr ";" */
     np = new_node(ND_EXPR_STMT);
-    np -> expr = expr();
+    np -> rhs = expr();
     expect(";");
     return np;
 }
