@@ -147,9 +147,9 @@ static Node* new_lvar_node(Token* tp){
     return np;
 }
 
-void parse(void);
 Function* function(void);
 static Node* stmt(void);
+static Node* compound_stmt(void);
 static Node* expr(void);
 static Node* assign(void);
 static Node* equality(void);
@@ -192,7 +192,7 @@ Function* function(void){
 }
 
 /* stmt = expr ";" 
-        | "{" stmt* "}"
+        | "{" compound-stmt
         | "return" expr ";" 
         | "if" "(" expr ")" stmt ("else" stmt)?
         | "while" "(" expr ")" stmt
@@ -201,14 +201,7 @@ static Node* stmt(void){
     Node* np;
 
     if(consume(TK_RESERVED, "{")){
-        np = new_node(ND_BLOCK);
-        np -> vec = new_vec();
-
-        while(!consume(TK_RESERVED, "}")){
-            vec_push(np -> vec, stmt());
-        }
-        
-        return np;
+        return compound_stmt();
     }
 
     /* "return" expr ";" */
@@ -266,6 +259,18 @@ static Node* stmt(void){
     np = new_node(ND_EXPR_STMT);
     np -> rhs = expr();
     expect(";");
+    return np;
+}
+
+/* compound-stmt = stmt* "}" */
+static Node* compound_stmt(void){
+    Node* np = new_node(ND_BLOCK);
+    np -> vec = new_vec();
+
+    while(!consume(TK_RESERVED, "}")){
+        vec_push(np -> vec, stmt());
+    }
+    
     return np;
 }
 
@@ -384,7 +389,7 @@ static Node* primary(void){
 }
 
 /* funcall = ident "(" func-args? ")" */
-static Node* funcall(Token* tp) {
+static Node* funcall(Token* tp){
     Node* np = new_node(ND_FUNCCALL);
     np -> funcname = get_ident(tp);
 
