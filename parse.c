@@ -288,10 +288,14 @@ static Node* assign(void){
 static Node* equality(void){
     Node* np = relational();
     for(;;){
-        if(consume("=="))
+        if(consume("==")){
             np = new_binary(ND_EQ, np, relational());
-        if(consume("!="))
+            continue;
+        }
+        if(consume("!=")){
             np = new_binary(ND_NE, np, relational()); 
+            continue;
+        }
         return np;
     }
 }
@@ -300,14 +304,22 @@ static Node* equality(void){
 static Node* relational(void){
     Node* np = add();
     for(;;){
-        if(consume("<"))
+        if(consume("<")){
             np = new_binary(ND_LT, np, add());
-        if(consume("<="))
+            continue;
+        }
+        if(consume("<=")){
             np = new_binary(ND_LE, np , add());
-        if(consume(">"))
+            continue;
+        }
+        if(consume(">")){
             np = new_binary(ND_LT, add(), np); /* x > y は y < xと同じ。 */
-        if(consume(">="))
+            continue;
+        }
+        if(consume(">=")){
             np = new_binary(ND_LE, add(), np); /* x >= y は y <= xと同じ */
+            continue;
+        }
         return np;
     }
 }
@@ -316,10 +328,14 @@ static Node* relational(void){
 static Node* add(void){
     Node* np = mul();
     for(;;){
-        if(consume("+"))
+        if(consume("+")){
             np = new_binary(ND_ADD, np, mul());
-        if(consume("-"))
+            continue;
+        }
+        if(consume("-")){
             np = new_binary(ND_SUB, np, mul());
+            continue;
+        }
         return np;
     }
 }
@@ -328,10 +344,14 @@ static Node* add(void){
 static Node* mul(void){
     Node* np = unary();
     for(;;){
-        if(consume("*"))
+        if(consume("*")){
             np = new_binary(ND_MUL, np, unary());
-        if(consume("/"))
+            continue;
+        }
+        if(consume("/")){
             np = new_binary(ND_DIV, np, unary());
+            continue;
+        }
         return np;
     }
 }

@@ -53,13 +53,13 @@ static void gen_expr(Node* np){
         case ND_FUNCCALL:
             /* 引数があれば */
             if(np -> args){
-                unsigned int i;
+                int i; // ここはintにしないとバグる。0 <= -1の評価が必要になるため。
                 for(i= np -> args -> len - 1; 0 <= i; i--){
                     gen_expr(np -> args -> data[i]); // 引数を逆順にスタックに積む。こうすると6つ以上の引数をとる関数呼び出を実現するのが簡単になる。
                     push();
                 }
-                // x86-64では先頭から6つの引数までをレジスタで渡す。
-                for(i = 0; i < np -> args -> len || 6 < i; i++){
+                // x86-64では先頭から6つの引数までをレジスタで渡す。TODO: 16btyeアラインメントする
+                for(i = 0; i < np -> args -> len && i < 6; i++){
                     pop(argreg[i]); // レジスタにストア(前から順番に。)
                 }
             }
@@ -215,13 +215,19 @@ void codegen(void){
         }
 
         unsigned int i;
-        /* パラメータをスタック領域にコピーする */
+        /* パラメータをスタック領域にコピー */
         for(i = 0; i < current_fp -> num_params; i++){
             Obj* lvar = current_fp -> locals -> data[i];
-            fprintf(STREAM, "\tmov [rbp - %d], %s\n", lvar -> offset, argreg[i]);
+            if(i < 6){
+                fprintf(STREAM, "\tmov [rbp - %d], %s\n", lvar -> offset, argreg[i]); // レジスタ渡し
+            }
+            else{
+                fprintf(STREAM, "\tmov rax, [rbp + %d]\n", 8 * (i - 4)); // 値をスタックから取得
+                fprintf(STREAM, "\tmov [rbp - %d], rax\n", lvar -> offset); 
+            }
         }
-        
-         /* コード生成 */
+
+        /* コード生成 */
         for(i = 0; i < current_fp -> body -> len; i++){
             gen_stmt(current_fp -> body -> data[i]);
         }
