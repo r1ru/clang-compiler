@@ -187,8 +187,8 @@ static void gen_stmt(Node* np){
             return;
         
         case ND_BLOCK:
-            for(unsigned int i = 0; i < np -> vec -> len; i++){
-                gen_stmt(np -> vec -> data[i]);
+            for(Node* n = np -> body; n; n = n -> next){
+                gen_stmt(n);
             }
             return;
 
@@ -222,8 +222,8 @@ void codegen(void){
         }
 
         /* コード生成 */
-        for(i = 0; i < current_fp -> body -> len; i++){
-            gen_stmt(current_fp -> body -> data[i]);
+        for(Node* n = fp -> body; n; n = n -> next){
+            gen_stmt(n);
         }
 
         /* エピローグ */

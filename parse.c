@@ -41,9 +41,9 @@ static Token* consume_ident(void){
     return tp;
 }
 
-/* TK_RESERVED用。トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
+/* トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
 static void expect(char* op){
-    if(token -> kind != TK_RESERVED || strlen(op) != token -> len || strncmp(op, token -> str, token -> len))
+    if(strlen(op) != token -> len || strncmp(op, token -> str, token -> len))
         error_at(token->str, "%sではありません\n", op);
     next_token();
 }
@@ -83,7 +83,7 @@ static Obj *find_lvar(Token* tp) {
     return NULL;
 }
 
-/* 新しい変数を作成してリストに登録 */
+/* 新しい変数を作成 */
 static Obj* new_lvar(char* name){
     Obj* lvar = calloc(1, sizeof(Obj));
     lvar -> name = name;
@@ -97,7 +97,6 @@ static Function* new_func(char* name){
     Function* fp = calloc(1, sizeof(Function));
     fp -> name = name;
     fp -> locals = new_vec();
-    fp -> body = new_vec();
     return fp;
 }
 
@@ -129,10 +128,9 @@ static Node* new_lvar_node(Token* tp){
 
     /* ローカル変数が既に登録されているか検索 */
     Obj* lvar = find_lvar(tp);
-    /* されていなければ作成してリストに登録 */
+    /* されていなければエラー */
     if(!lvar){
-        lvar = new_lvar(get_ident(tp));
-        vec_push(current_fp -> locals, lvar);
+        error("undefined variable %*.s", tp -> len, tp -> str);
     }
     np -> offset = lvar -> offset; 
     return np;
@@ -161,8 +159,9 @@ void parse(void){
     program = head.next;
 }
 
-/* function-definition = ident "(" func-params? ")" "{" stmt* "}" */
+/* function-definition = "int" ident "(" func-params? ")" "{" stmt* "}" */
 Function* function(void){
+    expect("int");
     char* name = expect_ident();
     Function* fp = new_func(name);
     current_fp = fp;
@@ -170,15 +169,14 @@ Function* function(void){
     /* 引数がある場合 */
     if(!is_equal(")")){
         do{ 
+            expect("int");
             vec_push(current_fp -> locals, new_lvar(expect_ident()));
             current_fp -> num_params++;
         }while(consume(","));
     }
     expect(")");
     expect("{");
-    while(!consume("}")){
-        vec_push(fp -> body, stmt());
-    }
+    fp -> body = compound_stmt();
     return fp;    
 }
 
@@ -253,15 +251,23 @@ static Node* stmt(void){
     return np;
 }
 
-/* compound-stmt = stmt* "}" */
+/* compound-stmt = (declaration | stmt)* "}" */
 static Node* compound_stmt(void){
     Node* np = new_node(ND_BLOCK);
-    np -> vec = new_vec();
+    Node head = {};
+    Node* cur = &head;
 
     while(!consume("}")){
-        vec_push(np -> vec, stmt());
+        if(is_equal("int")){
+            next_token(); // とりあえず読み飛ばすだけ。
+            vec_push(current_fp -> locals, new_lvar(expect_ident())); // 変数をリストに登録
+            expect(";");
+        }
+        else{
+            cur = cur -> next = stmt();
+        }
     }
-    
+    np -> body = head.next;
     return np;
 }
 

@@ -49,19 +49,20 @@ void tokenize(char* p);
 /* parse.c */
 typedef struct Obj Obj;
 
-struct Obj {
-  char *name; // 変数の名前
-  int offset; // RBPからのオフセット
+struct Obj{
+    char *name; // 変数の名前
+    int offset; // RBPからのオフセット
 };
 
 typedef struct Function Function;
+typedef struct Node Node;
 
 struct Function{
     Function* next;
     char* name; 
     size_t num_params; // 仮引数の数
     Vector* locals;
-    Vector* body;
+    Node* body;
     unsigned int stacksiz;
 };
 
@@ -88,9 +89,8 @@ typedef enum{
     ND_DEREF // unary *
 }NodeKind;
 
-typedef struct Node Node;
-
 struct Node{
+    Node* next;
     NodeKind kind;
     Node *lhs; // left hand side
     Node *rhs; // right hand side
@@ -105,7 +105,7 @@ struct Node{
     char* funcname; // function name
     Vector* args; // argments;
 
-    Vector* vec; // for compound statement
+    Node* body; // for compound statement
     int val; // ND_NUM用
     int offset; // ND_LVAL用
 };

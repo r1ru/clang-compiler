@@ -55,7 +55,7 @@ static bool startswith(char* p1, char* p2){
 
 /* keywordだった場合、keywordの長さを返す。それ以外の時0 */
 static size_t is_keyword(char* p){
-    static char* kw[] = {"return", "if", "else", "while", "for"};
+    static char* kw[] = {"return", "if", "else", "while", "for", "int"};
     for(size_t i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(strncmp(p, kw[i], strlen(kw[i])) == 0){
             return strlen(kw[i]);
@@ -111,6 +111,7 @@ void tokenize(char* p){
         size_t len = is_keyword(p);
         if(len){
             cur = new_token(TK_RESERVED, cur, p, len);
+            display_token(cur);
             p += len;
             continue;
         }
