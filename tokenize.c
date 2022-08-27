@@ -110,7 +110,7 @@ void tokenize(char* p){
 
          /* 一文字operatorの場合。
         strchrは第一引数で渡された検索対象から第二引数の文字を探してあればその文字へのポインターを、なければNULLを返す。*/
-        if(strchr("+-*/()<>;={},", *p)){
+        if(strchr("+-*/()<>;={},&*", *p)){
             cur = new_token(TK_RESERVED, cur, p, 1);
             display_token(cur);
             p++;

@@ -293,10 +293,9 @@ static Node* equality(void){
     for(;;){
         if(consume(TK_RESERVED, "=="))
             np = new_binary(ND_EQ, np, relational());
-        else if(consume(TK_RESERVED, "!="))
-            np = new_binary(ND_NE, np, relational());
-        else 
-            return np;
+        if(consume(TK_RESERVED, "!="))
+            np = new_binary(ND_NE, np, relational()); 
+        return np;
     }
 }
 
@@ -306,14 +305,13 @@ static Node* relational(void){
     for(;;){
         if(consume(TK_RESERVED, "<"))
             np = new_binary(ND_LT, np, add());
-        else if(consume(TK_RESERVED, "<="))
+        if(consume(TK_RESERVED, "<="))
             np = new_binary(ND_LE, np , add());
-        else if(consume(TK_RESERVED, ">"))
+        if(consume(TK_RESERVED, ">"))
             np = new_binary(ND_LT, add(), np); /* x > y は y < xと同じ。 */
-        else if(consume(TK_RESERVED, ">="))
+        if(consume(TK_RESERVED, ">="))
             np = new_binary(ND_LE, add(), np); /* x >= y は y <= xと同じ */
-        else 
-            return np;
+        return np;
     }
 }
 
@@ -323,10 +321,9 @@ static Node* add(void){
     for(;;){
         if(consume(TK_RESERVED, "+"))
             np = new_binary(ND_ADD, np, mul());
-        else if(consume(TK_RESERVED, "-"))
+        if(consume(TK_RESERVED, "-"))
             np = new_binary(ND_SUB, np, mul());
-        else
-            return np;
+        return np;
     }
 }
 
@@ -336,26 +333,36 @@ static Node* mul(void){
     for(;;){
         if(consume(TK_RESERVED, "*"))
             np = new_binary(ND_MUL, np, unary());
-        else if(consume(TK_RESERVED, "/"))
+        if(consume(TK_RESERVED, "/"))
             np = new_binary(ND_DIV, np, unary());
-        else 
-            return np;
+        return np;
     }
 }
 
-/* unary = ("+" | "-")? unary | primary ( - - 10のように連続する場合があるため。)*/
+/* ("+" | "-")? unaryになっているのは - - xのように連続する可能性があるから。*/
+/* unary    = ("+" | "-" | "&" | "*")? unary
+            | primary */
 static Node* unary(void){
+    Node* np;
     /* +はそのまま */
     if(consume(TK_RESERVED, "+")){
         return unary();
     }
     /* -xは0 - xと解釈する。 */
-    else if(consume(TK_RESERVED, "-")){
+    if(consume(TK_RESERVED, "-")){
         return new_binary(ND_SUB, new_num_node(0), unary());
     }
-    else{
-        return primary();
+    if(consume(TK_RESERVED, "&")){
+        np = new_node(ND_ADDR);
+        np -> rhs = unary();
+        return np;
     }
+    if(consume(TK_RESERVED, "*")){
+        np = new_node(ND_DEREF);
+        np -> rhs = unary();
+        return np;
+    }
+    return primary();
 }
 
 /* primary  = num 

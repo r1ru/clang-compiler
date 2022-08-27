@@ -88,7 +88,9 @@ typedef enum{
     ND_WHILE, // while
     ND_FOR, // for
     ND_BLOCK, // {}
-    ND_FUNCCALL // function call
+    ND_FUNCCALL, // function call
+    ND_ADDR, // unary &
+    ND_DEREF // unary *
 }NodeKind;
 
 typedef struct Node Node;

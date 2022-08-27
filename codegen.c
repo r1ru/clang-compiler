@@ -14,11 +14,19 @@ static void pop(char* arg){
     fprintf(STREAM, "\tpop %s\n", arg);
 }
 
-/* ローカル変数のアドレスを計算してrdiにセット */
+static void gen_expr(Node* np);
+
+/* アドレスを計算してraxにセット */
 static void gen_addr(Node *np) {
-    if (np->kind != ND_LVAR)
-        error("代入の左辺値が変数ではありません");
-    fprintf(STREAM, "\tlea rax, [rbp - %d]\n", np -> offset);
+    switch(np -> kind){
+        case ND_LVAR:
+            fprintf(STREAM, "\tlea rax, [rbp -%d]\n", np -> offset); // 変数のアドレスを計算
+            return;
+        case ND_DEREF:
+            gen_expr(np -> rhs);
+            return;
+    }
+    error("代入の左辺値が変数ではありません");
 }
 
 /* 式の評価結果はraxレジスタに格納される。 */
@@ -60,6 +68,15 @@ static void gen_expr(Node* np){
             if(np -> args && np -> args -> len > 6){
                 fprintf(STREAM, "\tsub rsp, %u\n", 8 * np -> args -> len - 6);
             }
+            return;
+        
+        case ND_ADDR:
+            gen_addr(np -> rhs);
+            return;
+        
+        case ND_DEREF:
+            gen_expr(np -> rhs); //なぜ式?
+            fprintf(STREAM, "\tmov rax, [rax]\n");
             return;
     }
 
