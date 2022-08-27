@@ -143,11 +143,11 @@ static void gen_stmt(Node* np){
 
         case ND_IF:
             gen_expr(np -> cond);
-            fprintf(STREAM, "\tcmp rax, 1\n");
-            fprintf(STREAM, "\tjne .L.%u\n", llabel_index); // 条件式が偽の時はelseに指定されているコードに飛ぶ
+            fprintf(STREAM, "\tcmp rax, 0\n");
+            fprintf(STREAM, "\tje .L.else.%u\n", llabel_index); // 条件式が偽の時はelseに指定されているコードに飛ぶ
             gen_stmt(np -> then); // 条件式が真の時に実行される。
             fprintf(STREAM, "\tjmp .L.end.%u\n", llabel_index);
-            fprintf(STREAM, ".L.%u:\n", llabel_index);
+            fprintf(STREAM, ".L.else.%u:\n", llabel_index);
             if(np -> els){
                 gen_stmt(np -> els); // 条件式が偽の時に実行される。
             }
@@ -156,12 +156,12 @@ static void gen_stmt(Node* np){
             return;
 
         case ND_WHILE:
-            fprintf(STREAM, ".L.%u:\n", llabel_index);
+            fprintf(STREAM, ".L.begin.%u:\n", llabel_index);
             gen_expr(np -> cond);
-            fprintf(STREAM, "\tcmp rax, 1\n");
-            fprintf(STREAM, "\tjne .L.end.%u\n", llabel_index); // 条件式が偽の時は終了
+            fprintf(STREAM, "\tcmp rax, 0\n");
+            fprintf(STREAM, "\tje .L.end.%u\n", llabel_index); // 条件式が偽の時は終了
             gen_stmt(np -> then); // 条件式が真の時に実行される。
-            fprintf(STREAM, "\tjmp .L.%u\n", llabel_index); // 条件式の評価に戻る
+            fprintf(STREAM, "\tjmp .L.begin.%u\n", llabel_index); // 条件式の評価に戻る
             fprintf(STREAM, ".L.end.%u:\n", llabel_index);
             llabel_index++; // インデックスを更新
             return;
@@ -170,18 +170,18 @@ static void gen_stmt(Node* np){
             if(np -> init){
                 gen_expr(np -> init);
             }
-            fprintf(STREAM, ".L.%u:\n", llabel_index);
+            fprintf(STREAM, ".L.begin.%u:\n", llabel_index);
             if(np -> cond){
                 gen_expr(np -> cond);
-                fprintf(STREAM, "\tcmp rax, 1\n");
-                fprintf(STREAM, "\tjne .L.end.%u\n", llabel_index); // 条件式が偽の時は終了
+                fprintf(STREAM, "\tcmp rax, 0\n");
+                fprintf(STREAM, "\tje .L.end.%u\n", llabel_index); // 条件式が偽の時は終了
 
             }
             gen_stmt(np -> then); // thenは必ずあることが期待されている。
             if(np -> inc){
                 gen_expr(np -> inc);
             }
-            fprintf(STREAM, "\tjmp .L.%u\n", llabel_index); // 条件式の評価に戻る
+            fprintf(STREAM, "\tjmp .L.begin.%u\n", llabel_index); // 条件式の評価に戻る
             fprintf(STREAM, ".L.end.%u:\n", llabel_index);
             llabel_index++; // インデックスを更新
             return;
