@@ -14,28 +14,6 @@ void error_at(char *loc, char *fmt, ...){
   fprintf(ERROR, "\n");
   exit(1);
 }
-/* for dubug */
-static void display_token(Token *tp){
-
-    switch(tp -> kind){
-
-        case TK_RESERVED:
-            fprintf(debug, "TK_RESERVED, str: %.*s\n", tp -> len, tp -> str);
-            return;
-
-        case TK_IDENT:
-            fprintf(debug, "TK_IDENT, ident: %.*s\n", tp -> len , tp -> str);
-            return;
-
-        case TK_NUM:
-            fprintf(debug, "TK_NUM, val: %d\n", tp -> val);
-            return;
-
-        case TK_EOF:
-            fprintf(debug, "TK_EOF\n");
-            return;
-    }
-}
 
 /* 新しいtokenを作成してcurにつなげる。*/
 static Token* new_token(TokenKind kind, Token* cur, char* str, int len){
@@ -43,7 +21,6 @@ static Token* new_token(TokenKind kind, Token* cur, char* str, int len){
     tp -> kind = kind;
     tp -> str = str;
     tp -> len = len;
-    display_token(tp);
     cur -> next = tp;
     return tp;
 }
@@ -133,4 +110,7 @@ void tokenize(char* p){
     
     /* トークンの先頭へのポインタをセット */
     token = head.next;
+
+    /* debug info */
+    display_tokenizer_output(token);
 }

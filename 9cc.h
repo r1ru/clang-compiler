@@ -11,9 +11,6 @@
 #define STREAM stdout
 #define ERROR stderr
 
-/* main.c */
-extern FILE* debug;
-
 /* utils.c */
 typedef struct{
     void** data; // 汎用
@@ -119,5 +116,12 @@ void parse(void);
 extern Function* program;
 
 void codegen(void);
+
+/* debug.c */
+extern FILE* debug;
+
+void display_tokenizer_output(Token* head);
+void display_parser_output(Function* head);
+
 
 #endif

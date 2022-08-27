@@ -157,6 +157,8 @@ void parse(void){
         cur = cur -> next = function();
     }
     program = head.next;
+    /* debug info */
+    display_parser_output(program);
 }
 
 /* function-definition = "int" ident "(" func-params? ")" "{" stmt* "}" */
