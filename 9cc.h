@@ -36,8 +36,8 @@ typedef enum{
 }TokenKind;
 
 struct Token{
-    TokenKind kind;
     Token* next;
+    TokenKind kind;
     int val;
     char* str;
     int len; // トークンの長さ

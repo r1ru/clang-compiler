@@ -14,17 +14,6 @@ void error_at(char *loc, char *fmt, ...){
   fprintf(ERROR, "\n");
   exit(1);
 }
-
-/* 新しいtokenを作成してcurにつなげる。*/
-static Token* new_token(TokenKind kind, Token* cur, char* str, int len){
-    Token* tp = calloc(1, sizeof(Token));
-    tp -> kind = kind;
-    tp -> str = str;
-    tp -> len = len;
-    cur -> next = tp;
-    return tp;
-}
-
 /* for dubug */
 static void display_token(Token *tp){
 
@@ -46,6 +35,17 @@ static void display_token(Token *tp){
             fprintf(debug, "TK_EOF\n");
             return;
     }
+}
+
+/* 新しいtokenを作成してcurにつなげる。*/
+static Token* new_token(TokenKind kind, Token* cur, char* str, int len){
+    Token* tp = calloc(1, sizeof(Token));
+    tp -> kind = kind;
+    tp -> str = str;
+    tp -> len = len;
+    display_token(tp);
+    cur -> next = tp;
+    return tp;
 }
 
 /* 文字列を比較。memcmpは成功すると0を返す。 */
@@ -86,7 +86,6 @@ void tokenize(char* p){
             q = p;
             cur -> val = strtol(p, &p, 10);
             cur -> len = p - q; /* 長さを記録 */
-            display_token(cur);
             continue;
         }
 
@@ -94,7 +93,6 @@ void tokenize(char* p){
         /* 可変長operator。これを先に置かないと例えば<=が<と=という二つに解釈されてしまう。*/
         if(startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=")) {
             cur = new_token(TK_RESERVED, cur, p, 2);
-            display_token(cur);
             p += 2;
             continue;
         }
@@ -103,7 +101,6 @@ void tokenize(char* p){
         strchrは第一引数で渡された検索対象から第二引数の文字を探してあればその文字へのポインターを、なければNULLを返す。*/
         if(strchr("+-*/()<>;={},&*", *p)){
             cur = new_token(TK_RESERVED, cur, p, 1);
-            display_token(cur);
             p++;
             continue;
         }
@@ -111,7 +108,6 @@ void tokenize(char* p){
         size_t len = is_keyword(p);
         if(len){
             cur = new_token(TK_RESERVED, cur, p, len);
-            display_token(cur);
             p += len;
             continue;
         }
@@ -124,7 +120,6 @@ void tokenize(char* p){
                 p++;
             }
             cur -> len = p - q; /* 長さを記録 */
-            display_token(cur);
             
             continue;
         }
@@ -135,7 +130,6 @@ void tokenize(char* p){
 
     /* 終了を表すトークンを作成 */
     cur = new_token(TK_EOF, cur, p, 0);
-    //display_token(cur);
     
     /* トークンの先頭へのポインタをセット */
     token = head.next;
