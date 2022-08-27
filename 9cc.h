@@ -57,9 +57,9 @@ typedef struct Node Node;
 struct Function{
     Function* next;
     char* name; 
-    size_t num_params; // 仮引数の数
+    unsigned int num_params; // 仮引数の数
     Vector* locals;
-    Node* body;
+    Vector* body;
     unsigned int stacksiz;
 };
 
@@ -102,7 +102,7 @@ struct Node{
     char* funcname; // function name
     Vector* args; // argments;
 
-    Node* body; // for compound statement
+    Vector* body; // for compound statement
     int val; // ND_NUM用
     int offset; // ND_LVAL用
 };

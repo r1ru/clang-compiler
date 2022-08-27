@@ -31,6 +31,7 @@ static void display_obj(Obj* objp){
 static void display_func(Function* fp){
     fprintf(debug, "%s  ", fp -> name);
     fprintf(debug, "%lu parameters  ", fp -> num_params);
+    fprintf(debug, "%u statements  ", fp -> body -> len);
     fprintf(debug, "%u local variables\n", fp -> locals -> len);
     int i;
     for(i = 0; i < fp -> locals -> len; i++){

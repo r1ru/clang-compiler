@@ -53,7 +53,7 @@ static void gen_expr(Node* np){
         case ND_FUNCCALL:
             /* 引数があれば */
             if(np -> args){
-                int i;
+                unsigned int i;
                 for(i= np -> args -> len - 1; 0 <= i; i--){
                     gen_expr(np -> args -> data[i]); // 引数を逆順にスタックに積む。こうすると6つ以上の引数をとる関数呼び出を実現するのが簡単になる。
                     push();
@@ -187,8 +187,8 @@ static void gen_stmt(Node* np){
             return;
         
         case ND_BLOCK:
-            for(Node* n = np -> body; n; n = n -> next){
-                gen_stmt(n);
+             for(unsigned int i = 0; i < np -> body -> len; i++){
+                gen_stmt(np -> body -> data[i]);
             }
             return;
 
@@ -214,16 +214,16 @@ void codegen(void){
             fprintf(STREAM, "\tsub rsp, %u\n", current_fp -> stacksiz);
         }
 
-        int i;
+        unsigned int i;
         /* パラメータをスタック領域にコピーする */
         for(i = 0; i < current_fp -> num_params; i++){
             Obj* lvar = current_fp -> locals -> data[i];
             fprintf(STREAM, "\tmov [rbp - %d], %s\n", lvar -> offset, argreg[i]);
         }
-
-        /* コード生成 */
-        for(Node* n = fp -> body; n; n = n -> next){
-            gen_stmt(n);
+        
+         /* コード生成 */
+        for(i = 0; i < current_fp -> body -> len; i++){
+            gen_stmt(current_fp -> body -> data[i]);
         }
 
         /* エピローグ */
