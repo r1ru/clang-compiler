@@ -32,12 +32,7 @@ typedef enum{
     TK_RESERVED,
     TK_IDENT, // 識別子
     TK_NUM,
-    TK_EOF,
-    TK_RET, // return
-    TK_IF, // if
-    TK_ELSE, // else
-    TK_WHILE, // while
-    TK_FOR // for
+    TK_EOF
 }TokenKind;
 
 struct Token{

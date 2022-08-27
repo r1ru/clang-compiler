@@ -45,32 +45,23 @@ static void display_token(Token *tp){
         case TK_EOF:
             fprintf(debug, "TK_EOF\n");
             return;
-
-        case TK_RET:
-            fprintf(debug, "TK_RET, str: %.*s\n", tp -> len, tp -> str);
-            return;
-        
-        case TK_IF:
-            fprintf(debug, "TK_IF, str: %.*s\n", tp -> len, tp -> str);
-            return;
-        
-        case TK_ELSE:
-            fprintf(debug, "TK_ELSE, str: %.*s\n", tp -> len, tp -> str);
-            return;
-        
-        case TK_WHILE:
-            fprintf(debug, "TK_WHILE, str: %.*s\n", tp -> len, tp -> str);
-            return;
-
-        case TK_FOR:
-            fprintf(debug, "TK_FOR, str: %.*s\n", tp -> len, tp -> str);
-            return;
     }
 }
 
 /* 文字列を比較。memcmpは成功すると0を返す。 */
 static bool startswith(char* p1, char* p2){
-    return memcmp(p1, p2, strlen(p2)) == 0;
+    return strncmp(p1, p2, strlen(p2)) == 0;
+}
+
+/* keywordだった場合、keywordの長さを返す。それ以外の時0 */
+static size_t is_keyword(char* p){
+    static char* kw[] = {"return", "if", "else", "while", "for"};
+    for(size_t i =0; i < sizeof(kw) / sizeof(*kw); i++){
+        if(strncmp(p, kw[i], strlen(kw[i])) == 0){
+            return strlen(kw[i]);
+        }
+    }
+    return 0;
 }
 
 /* 入力文字列をトークナイズしてそれを返す */
@@ -117,43 +108,10 @@ void tokenize(char* p){
             continue;
         }
 
-         /* returnの場合(これはローカル変数よりも前に来なければならない。) */
-        if(startswith(p, "return")){
-            cur = new_token(TK_RET, cur, p, 6);
-            display_token(cur);
-            p += 6;
-            continue;
-        }
-
-        /* ifの場合 */
-        if(startswith(p, "if")){
-            cur = new_token(TK_IF, cur, p, 2);
-            display_token(cur);
-            p += 2;
-            continue;
-        }
-
-        /* elseの場合 */
-        if(startswith(p, "else")){
-            cur = new_token(TK_ELSE, cur, p, 4);
-            display_token(cur);
-            p += 4;
-            continue;
-        }
-
-        /* whileの場合 */
-        if(startswith(p, "while")){
-            cur = new_token(TK_WHILE, cur, p, 5);
-            display_token(cur);
-            p += 5;
-            continue;
-        }
-
-        /* forの場合 */
-        if(startswith(p, "for")){
-            cur = new_token(TK_FOR, cur, p, 3);
-            display_token(cur);
-            p += 3;
+        size_t len = is_keyword(p);
+        if(len){
+            cur = new_token(TK_RESERVED, cur, p, len);
+            p += len;
             continue;
         }
 

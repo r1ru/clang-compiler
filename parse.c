@@ -9,29 +9,20 @@ static void next_token(void){
     token = token -> next;
 }
 
-/* TK_RESERVED用。トークンが期待した記号のときは真を返す。それ以外のときは偽を返す。*/
+/* トークンの記号が期待したもののときtrue。それ以外の時false */
 static bool is_equal(char* op){
-    if(token -> kind != TK_RESERVED || strlen(op) != token -> len || strncmp(op, token -> str, token -> len))
+    if(strlen(op) != token -> len || strncmp(op, token -> str, token -> len))
         return false;
     return true;
 }
 
-/* トークンが期待した種類の記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
-static bool consume(TokenKind kind, char* op){
-    switch(kind){
-        /* TK_RESERVEDの場合は文字列が一致するかチェック */
-        case TK_RESERVED:
-            if(strlen(op) != token -> len || strncmp(op, token -> str, token -> len)){
-                return false;
-            }
-        /* それ以外の場合はkindが一致するか調べるのみ */
-        default:
-            if(kind != token -> kind){
-                return false;
-            }
+/* トークンが期待した記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
+static bool consume(char* op){
+    if(is_equal(op)){
         next_token();
         return true;
     }
+    return false;
 }
 
 /* トークンの名前をバッファに格納してポインタを返す。strndupと同じ動作。 */
@@ -181,11 +172,11 @@ Function* function(void){
         do{ 
             vec_push(current_fp -> locals, new_lvar(expect_ident()));
             current_fp -> num_params++;
-        }while(consume(TK_RESERVED, ","));
+        }while(consume(","));
     }
     expect(")");
     expect("{");
-    while(!consume(TK_RESERVED, "}")){
+    while(!consume("}")){
         vec_push(fp -> body, stmt());
     }
     return fp;    
@@ -200,12 +191,12 @@ Function* function(void){
 static Node* stmt(void){
     Node* np;
 
-    if(consume(TK_RESERVED, "{")){
+    if(consume("{")){
         return compound_stmt();
     }
 
     /* "return" expr ";" */
-    if(consume(TK_RET, NULL)){
+    if(consume("return")){
         np = new_node(ND_RET);
         np -> rhs = expr();
         expect(";");
@@ -213,20 +204,20 @@ static Node* stmt(void){
     }
 
     /* "if" "(" expr ")" stmt ("else" stmt)? */
-    if(consume(TK_IF, NULL)){
+    if(consume("if")){
         expect("(");
         np = new_node(ND_IF);
         np -> cond = expr();
         expect(")");
         np -> then = stmt();
-        if(consume(TK_ELSE, NULL)){
+        if(consume("else")){
             np -> els = stmt();
         }
         return np;
     }
 
     /* "while" "(" expr ")" stmt */
-    if(consume(TK_WHILE, NULL)){
+    if(consume("while")){
         expect("(");
         np = new_node(ND_WHILE);
         np -> cond = expr();
@@ -236,7 +227,7 @@ static Node* stmt(void){
     }
 
     /* "for" "(" expr? ";" expr? ";" expr? ")" stmt */
-    if(consume(TK_FOR, NULL)){
+    if(consume("for")){
         expect("(");
         np = new_node(ND_FOR);
         if(!is_equal(";")){
@@ -267,7 +258,7 @@ static Node* compound_stmt(void){
     Node* np = new_node(ND_BLOCK);
     np -> vec = new_vec();
 
-    while(!consume(TK_RESERVED, "}")){
+    while(!consume("}")){
         vec_push(np -> vec, stmt());
     }
     
@@ -282,7 +273,7 @@ static Node* expr(void){
 /* assign = equality ("=" assign)? */
 static Node* assign(void){
     Node* np = equality();
-    if(consume(TK_RESERVED, "="))
+    if(consume("="))
         np = new_binary(ND_ASSIGN, np, assign()); // 代入は式。
     return np;
 }
@@ -291,9 +282,9 @@ static Node* assign(void){
 static Node* equality(void){
     Node* np = relational();
     for(;;){
-        if(consume(TK_RESERVED, "=="))
+        if(consume("=="))
             np = new_binary(ND_EQ, np, relational());
-        if(consume(TK_RESERVED, "!="))
+        if(consume("!="))
             np = new_binary(ND_NE, np, relational()); 
         return np;
     }
@@ -303,13 +294,13 @@ static Node* equality(void){
 static Node* relational(void){
     Node* np = add();
     for(;;){
-        if(consume(TK_RESERVED, "<"))
+        if(consume("<"))
             np = new_binary(ND_LT, np, add());
-        if(consume(TK_RESERVED, "<="))
+        if(consume("<="))
             np = new_binary(ND_LE, np , add());
-        if(consume(TK_RESERVED, ">"))
+        if(consume(">"))
             np = new_binary(ND_LT, add(), np); /* x > y は y < xと同じ。 */
-        if(consume(TK_RESERVED, ">="))
+        if(consume(">="))
             np = new_binary(ND_LE, add(), np); /* x >= y は y <= xと同じ */
         return np;
     }
@@ -319,9 +310,9 @@ static Node* relational(void){
 static Node* add(void){
     Node* np = mul();
     for(;;){
-        if(consume(TK_RESERVED, "+"))
+        if(consume("+"))
             np = new_binary(ND_ADD, np, mul());
-        if(consume(TK_RESERVED, "-"))
+        if(consume("-"))
             np = new_binary(ND_SUB, np, mul());
         return np;
     }
@@ -331,9 +322,9 @@ static Node* add(void){
 static Node* mul(void){
     Node* np = unary();
     for(;;){
-        if(consume(TK_RESERVED, "*"))
+        if(consume("*"))
             np = new_binary(ND_MUL, np, unary());
-        if(consume(TK_RESERVED, "/"))
+        if(consume("/"))
             np = new_binary(ND_DIV, np, unary());
         return np;
     }
@@ -345,19 +336,19 @@ static Node* mul(void){
 static Node* unary(void){
     Node* np;
     /* +はそのまま */
-    if(consume(TK_RESERVED, "+")){
+    if(consume("+")){
         return unary();
     }
     /* -xは0 - xと解釈する。 */
-    if(consume(TK_RESERVED, "-")){
+    if(consume("-")){
         return new_binary(ND_SUB, new_num_node(0), unary());
     }
-    if(consume(TK_RESERVED, "&")){
+    if(consume("&")){
         np = new_node(ND_ADDR);
         np -> rhs = unary();
         return np;
     }
-    if(consume(TK_RESERVED, "*")){
+    if(consume("*")){
         np = new_node(ND_DEREF);
         np -> rhs = unary();
         return np;
@@ -374,7 +365,7 @@ static Node* primary(void){
     Token* tp;
 
     /* "("ならexprを呼ぶ */
-    if(consume(TK_RESERVED, "(")){
+    if(consume("(")){
         np = expr();
         expect(")");
         return np;
@@ -384,7 +375,7 @@ static Node* primary(void){
     tp = consume_ident();
     if(tp){
         /* ()が続くなら関数呼び出し */
-        if(consume(TK_RESERVED, "(")){
+        if(consume("(")){
             return funcall(tp);
         }
         np = new_lvar_node(tp);
@@ -405,7 +396,7 @@ static Node* funcall(Token* tp){
         np -> args = new_vec();
         do{
             vec_push(np->args, expr());
-        }while(consume(TK_RESERVED, ","));
+        }while(consume(","));
     }
     expect(")");
     return np;   
