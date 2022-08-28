@@ -84,12 +84,34 @@ static Obj *find_lvar(Token* tp) {
 }
 
 /* 新しい変数を作成 */
-static Obj* new_lvar(char* name){
+static Obj* new_var(char* name, Type* ty){
     Obj* lvar = calloc(1, sizeof(Obj));
+    lvar -> ty = ty;
     lvar -> name = name;
     current_fp -> stacksiz += 8;
     lvar -> offset = current_fp -> stacksiz; // TOOD: ここをもう少し分かりやすく。
     return lvar;
+}
+
+static Type* get_type(void){
+    if(consume("int")){
+        return ty_int;
+    }
+    error("unknown type");
+}
+
+/* 新しい変数を作成して引数で指定されたVectorに格納。 */
+static void new_lvar(void){
+    Type* ty = get_type();
+    while(consume("*")){
+        ty = pointer_to(ty);
+    }
+    Obj* lvar = find_lvar(token);
+    /* 重複定義はエラー */
+    if(lvar){
+        error_at(token -> str, "error: variable is already defined");
+    }
+    vec_push(current_fp -> locals, new_var(expect_ident(), ty));
 }
 
 /* 新しい関数を作成 */
@@ -130,7 +152,7 @@ static Node* new_lvar_node(Token* tp){
     Obj* lvar = find_lvar(tp);
     /* されていなければエラー */
     if(!lvar){
-        error("undefined variable %*.s", tp -> len, tp -> str);
+        error_at(tp -> str, "error: undefined variable");
     }
     np -> var = lvar; 
     return np;
@@ -171,8 +193,7 @@ Function* function(void){
     /* 引数がある場合 */
     if(!is_equal(")")){
         do{ 
-            expect("int");
-            vec_push(current_fp -> locals, new_lvar(expect_ident()));
+            new_lvar();
         }while(consume(","));
     }
     current_fp -> num_params = current_fp -> locals -> len;
@@ -259,8 +280,7 @@ static Node* compound_stmt(void){
     np -> body = new_vec();
     while(!consume("}")){
         if(is_equal("int")){
-            next_token(); // とりあえず読み飛ばすだけ。
-            vec_push(current_fp -> locals, new_lvar(expect_ident())); // 変数をリストに登録
+            new_lvar();
             expect(";");
         }
         else{

@@ -43,10 +43,27 @@ struct Token{
 void error_at(char *loc, char *fmt, ...);
 void tokenize(char* p);
 
+/* type.c */
+typedef enum{
+    TY_INT,
+    TY_PTR
+}TypeKind;
+
+typedef struct Type Type;
+struct Type{
+    TypeKind kind;
+    Type *ptr_to; // kindがTY_PTRの時のみ有効
+};
+
+extern Type *ty_int;
+
+Type* pointer_to(Type *base);
+
 /* parse.c */
 typedef struct Obj Obj;
 
 struct Obj{
+    Type *ty; // 型情報
     char *name; // 変数の名前
     int offset; // RBPからのオフセット
 };

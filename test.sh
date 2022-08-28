@@ -138,4 +138,6 @@ assert 7 'int main(){ int x; int y; x=3; y=5; *(&x-8)=7; return y; }'
 assert 7 'int main(){ int x; int y; x=3; y=5; *(&y+8)=7; return x; }'
 
 assert 28 'int main(){ return add8(0,1,2,3,4,5,6,7);} int add8(int a, int b, int c, int d, int e, int f, int g, int h){ return a + b + c + d+ e + f + g + h;}'
+
+assert 3 'int main(){int x; int *y; y = &x; *y = 3; return x;}'
 echo OK
