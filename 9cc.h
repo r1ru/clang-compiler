@@ -59,7 +59,7 @@ struct Function{
     char* name; 
     unsigned int num_params; // 仮引数の数
     Vector* locals;
-    Vector* body;
+    Node* body; // ND_BLOCK
     unsigned int stacksiz;
 };
 

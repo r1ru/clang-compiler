@@ -138,7 +138,7 @@ static Node* new_lvar_node(Token* tp){
 
 Function* function(void);
 static Node* stmt(void);
-static Vector* compound_stmt(void);
+static Node* compound_stmt(void);
 static Node* expr(void);
 static Node* assign(void);
 static Node* equality(void);
@@ -173,9 +173,9 @@ Function* function(void){
         do{ 
             expect("int");
             vec_push(current_fp -> locals, new_lvar(expect_ident()));
-            current_fp -> num_params++;
         }while(consume(","));
     }
+    current_fp -> num_params = current_fp -> locals -> len;
     expect(")");
     expect("{");
     fp -> body = compound_stmt();
@@ -192,9 +192,7 @@ static Node* stmt(void){
     Node* np;
 
     if(consume("{")){
-        np = new_node(ND_BLOCK);
-        np -> body = compound_stmt();
-        return np;
+        return compound_stmt();
     }
 
     /* "return" expr ";" */
@@ -256,8 +254,9 @@ static Node* stmt(void){
 }
 
 /* compound-stmt = (declaration | stmt)* "}" */
-static Vector* compound_stmt(void){
-    Vector* body = new_vec();
+static Node* compound_stmt(void){
+    Node *np = new_node(ND_BLOCK);
+    np -> body = new_vec();
     while(!consume("}")){
         if(is_equal("int")){
             next_token(); // とりあえず読み飛ばすだけ。
@@ -265,10 +264,10 @@ static Vector* compound_stmt(void){
             expect(";");
         }
         else{
-            vec_push(body, stmt());
+            vec_push(np -> body, stmt());
         }
     }
-    return body;
+    return np;
 }
 
 /* expr = assign */

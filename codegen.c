@@ -228,9 +228,7 @@ void codegen(void){
         }
 
         /* コード生成 */
-        for(i = 0; i < current_fp -> body -> len; i++){
-            gen_stmt(current_fp -> body -> data[i]);
-        }
+        gen_stmt(fp -> body);
 
         /* エピローグ */
         fprintf(STREAM, ".L.end.%s:\n", current_fp -> name); // このラベルは関数ごと。
