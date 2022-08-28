@@ -20,7 +20,7 @@ static void gen_expr(Node* np);
 static void gen_addr(Node *np) {
     switch(np -> kind){
         case ND_LVAR:
-            fprintf(STREAM, "\tlea rax, [rbp -%d]\n", np -> offset); // 変数のアドレスを計算
+            fprintf(STREAM, "\tlea rax, [rbp -%d]\n", np -> var -> offset); // 変数のアドレスを計算
             return;
         case ND_DEREF:
             gen_expr(np -> rhs);

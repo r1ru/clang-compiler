@@ -104,7 +104,7 @@ struct Node{
 
     Vector* body; // for compound statement
     int val; // ND_NUM用
-    int offset; // ND_LVAL用
+    Obj* var; // ND_LVAL用
 };
 
 extern Token *token;

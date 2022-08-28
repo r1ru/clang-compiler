@@ -132,7 +132,7 @@ static Node* new_lvar_node(Token* tp){
     if(!lvar){
         error("undefined variable %*.s", tp -> len, tp -> str);
     }
-    np -> offset = lvar -> offset; 
+    np -> var = lvar; 
     return np;
 }
 
