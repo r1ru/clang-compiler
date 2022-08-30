@@ -54,6 +54,7 @@ typedef enum{
 typedef struct Type Type;
 struct Type{
     TypeKind kind;
+    unsigned int size;
     Type *base; // kindがTY_PTRの時のみ有効
 };
 

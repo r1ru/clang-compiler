@@ -4,7 +4,8 @@ Function* program;
 
 static Function* current_fp; // 現在コードを生成している関数へのポインタ
 static unsigned int llabel_index; // ローカルラベル用のインデックス
-static char* argreg[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+static char* argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+static char* argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
 
 static void push(void){
     fprintf(STREAM, "\tpush rax\n");
@@ -12,6 +13,27 @@ static void push(void){
 
 static void pop(char* arg){
     fprintf(STREAM, "\tpop %s\n", arg);
+}
+
+/* raxに入ってるアドレスにから値を読む。*/
+static void load(Type* ty){
+    if(ty -> size == 4){
+        fprintf(STREAM, "\tmov eax, [rax]\n");
+    }
+    else{
+        fprintf(STREAM, "\tmov rax, [rax]\n");
+    }
+}
+
+/* スタックに積まれているアドレスに値を格納。*/
+static void store(Type *ty){
+    pop("rdi");
+    if(ty -> size == 4){
+        fprintf(STREAM, "\tmov [rdi], eax\n");
+    }
+    else{
+       fprintf(STREAM, "\tmov [rdi], rax\n"); 
+    }
 }
 
 static void gen_expr(Node* np);
@@ -36,20 +58,18 @@ static void gen_expr(Node* np){
             fprintf(STREAM, "\tmov rax, %d\n", np -> val); /* ND_NUMなら入力が一つの数値だったということ。*/
             return;
         
-        /* これは1+aのように識別子が左辺値以外で使われる場合に使用される */
         case ND_LVAR:
-            gen_addr(np); /* 自分自身のアドレス */ 
-            fprintf(STREAM, "\tmov rax, [rax]\n"); // ローカル変数の値をraxにいれる。
+            gen_addr(np);
+            load(np -> ty);
             return;
 
         case ND_ASSIGN:
             gen_addr(np -> lhs);
             push();// pushしないと上書きされる可能性がある。
             gen_expr(np -> rhs); // 右辺を計算。
-            pop("rdi"); // アドレスをpop
-            fprintf(STREAM, "\tmov [rdi], rax\n"); /* ローカル変数へ代入 */
+            store(np -> ty);
             return;
-        
+
         case ND_FUNCCALL:
             /* 引数があれば */
             if(np -> args){
@@ -60,14 +80,10 @@ static void gen_expr(Node* np){
                 }
                 // x86-64では先頭から6つの引数までをレジスタで渡す。TODO: 16btyeアラインメントする
                 for(i = 0; i < np -> args -> len && i < 6; i++){
-                    pop(argreg[i]); // レジスタにストア(前から順番に。)
+                    pop(argreg64[i]); // レジスタにストア(前から順番に。)
                 }
             }
             fprintf(STREAM, "\tcall %s\n", np -> funcname);
-
-            if(np -> args && np -> args -> len > 6){
-                fprintf(STREAM, "\tsub rsp, %u\n", 8 * np -> args -> len - 6);
-            }
             return;
         
         case ND_ADDR:
@@ -85,25 +101,25 @@ static void gen_expr(Node* np){
     push();
     gen_expr(np -> lhs);
 
-    fprintf(STREAM, "\tpop rdi\n"); //rhs
+    pop("rdi");
 
     switch(np -> kind){
         case ND_ADD:
-        fprintf(STREAM, "\tadd rax, rdi\n");
-        break;
+            fprintf(STREAM, "\tadd rax, rdi\n");
+            return;
     
         case ND_SUB:
             fprintf(STREAM, "\tsub rax, rdi\n");
-            break;
+            return;
 
         case ND_MUL:
             fprintf(STREAM, "\timul rax, rdi\n");
-            break;
+            return;
 
         case ND_DIV:
             fprintf(STREAM, "\tcqo\n");
             fprintf(STREAM, "\tidiv rdi\n");
-            break;
+            return;
 
         case ND_EQ:
         case ND_NE:
@@ -123,6 +139,7 @@ static void gen_expr(Node* np){
             fprintf(STREAM, "\tsetle al\n");
         }
         fprintf(STREAM, "\tmovzb rax, al\n");
+        return;
     }    
 }
 
@@ -191,6 +208,15 @@ static void gen_stmt(Node* np){
     }
 }
 
+static void store_arg(int i, int offset, unsigned int size){
+    if(size == 4){
+        fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg32[i]);
+    }
+    else{
+         fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg64[i]);
+    }
+}
+
 void codegen(void){
     fprintf(STREAM, ".intel_syntax noprefix\n");
     for (Function *fp = program; fp; fp = fp->next) {
@@ -209,15 +235,9 @@ void codegen(void){
 
         unsigned int i;
         /* パラメータをスタック領域にコピー */
-        for(i = 0; i < current_fp -> num_params; i++){
+        for(i = 0; i < current_fp -> num_params && i < 6; i++){
             Obj* lvar = current_fp -> locals -> data[i];
-            if(i < 6){
-                fprintf(STREAM, "\tmov [rbp - %d], %s\n", lvar -> offset, argreg[i]); // レジスタ渡し
-            }
-            else{
-                fprintf(STREAM, "\tmov rax, [rbp + %d]\n", 8 * (i - 4)); // 値をスタックから取得
-                fprintf(STREAM, "\tmov [rbp - %d], rax\n", lvar -> offset); 
-            }
+            store_arg(i, lvar -> offset, lvar -> ty -> size);
         }
 
         /* コード生成 */

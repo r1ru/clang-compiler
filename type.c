@@ -1,10 +1,11 @@
 #include "9cc.h"
 
-Type *ty_int = &(Type){TY_INT};
+Type *ty_int = &(Type){TY_INT, 4};
 
 Type* pointer_to(Type *base){
     Type *ty = calloc(1, sizeof(Type));
     ty -> kind = TY_PTR;
+    ty -> size = 8;
     ty -> base = base;
     return ty;
 }
@@ -41,9 +42,11 @@ void add_type(Node *node) {
         case ND_NE:
         case ND_LT:
         case ND_LE:
+            add_type(node -> rhs);
+            add_type(node -> lhs);
         case ND_NUM:
         case ND_FUNCCALL:
-            node -> ty = ty_int;
+            node -> ty = ty_int; // TODO: ここを直す。
             return;
         case ND_LVAR:
             node -> ty = node -> var -> ty;
