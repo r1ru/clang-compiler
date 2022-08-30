@@ -60,8 +60,9 @@ struct Type{
 extern Type *ty_int;
 
 Type* pointer_to(Type *base);
-bool is_integer(Node* np);
-bool is_ptr(Node* np);
+bool is_integer(Type *ty);
+bool is_ptr(Type* ty);
+void add_type(Node* np);
 
 /* parse.c */
 typedef struct Obj Obj;
@@ -110,6 +111,8 @@ typedef enum{
 struct Node{
     Node* next;
     NodeKind kind;
+    Type *ty;
+
     Node *lhs; // left hand side
     Node *rhs; // right hand side
    

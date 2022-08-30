@@ -287,7 +287,9 @@ static Node* compound_stmt(void){
             expect(";");
         }
         else{
-            vec_push(np -> body, stmt());
+            Node *s = stmt();
+            add_type(s); // 型チェック
+            vec_push(np -> body, s); 
         }
     }
     return np;
@@ -347,35 +349,39 @@ static Node* relational(void){
 }
 
 static Node* new_add(Node *lhs, Node *rhs){
+    add_type(lhs);
+    add_type(rhs);
     /* pointer + pointerはエラー */
-    if(is_ptr(lhs) && is_ptr(rhs)){
+    if(is_ptr(lhs -> ty) && is_ptr(rhs -> ty)){
         error("error: invalid operand");
     }
     /* num + pointer を pointer + num に変更　*/
-    if(is_integer(lhs) && is_ptr(rhs)){
+    if(is_integer(lhs -> ty) && is_ptr(rhs -> ty)){
         Node* tmp = rhs;
         lhs = rhs;
         rhs = tmp;
     }
     /* pointer + num は pointer + sizeof(type) * numに変更 */
-    if(is_ptr(lhs) && is_integer(rhs)){
+    if(is_ptr(lhs -> ty) && is_integer(rhs -> ty)){
         rhs = new_binary(ND_MUL, new_num_node(8), rhs);
     }
     return new_binary(ND_ADD, lhs, rhs);
 }
 
 static Node* new_sub(Node *lhs, Node *rhs){
+    add_type(lhs);
+    add_type(rhs);
     /* num - pointerはエラー */
-    if(is_integer(lhs) && is_ptr(rhs)){
+    if(is_integer(lhs -> ty) && is_ptr(rhs -> ty)){
         error("error: invalid operand");
     }
     /* pointer - pointerは要素数(どちらの型も同じことが期待されている。) */
-    if(is_ptr(lhs) && is_ptr(rhs)){
+    if(is_ptr(lhs -> ty) && is_ptr(rhs -> ty)){
         lhs = new_binary(ND_SUB, lhs, rhs);
         return new_binary(ND_MUL, lhs, new_num_node(8));
     }
     /* pointer - num は pointer - sizeof(type) * num */
-    if(is_ptr(lhs) && is_integer(rhs)){
+    if(is_ptr(lhs -> ty) && is_integer(rhs -> ty)){
         rhs = new_binary(ND_MUL, new_num_node(8), rhs);
     }
     return new_binary(ND_SUB, lhs, rhs);
