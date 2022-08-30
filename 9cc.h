@@ -77,6 +77,7 @@ typedef struct Function Function;
 struct Function{
     Function* next;
     char* name; 
+    Type *ret_ty; //返り値のタイプ
     unsigned int num_params; // 仮引数の数
     Vector* locals;
     Node* body; // ND_BLOCK

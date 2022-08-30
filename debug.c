@@ -29,6 +29,13 @@ static void display_obj(Obj* objp){
 }
 
 static void display_func(Function* fp){
+    switch(fp -> ret_ty -> kind){
+        case TY_PTR:
+            fprintf(debug, "TY_PTR  ");
+            break;
+        default:
+            fprintf(debug, "TY_INT  ");
+    }
     fprintf(debug, "%s  ", fp -> name);
     fprintf(debug, "%u parameters  ", fp -> num_params);
     fprintf(debug, "%u statements  ", fp -> body -> body -> len);

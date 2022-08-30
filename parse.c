@@ -115,8 +115,9 @@ static void new_lvar(void){
 }
 
 /* 新しい関数を作成 */
-static Function* new_func(char* name){
+static Function* new_func(char* name, Type *ret_ty){
     Function* fp = calloc(1, sizeof(Function));
+    fp -> ret_ty = ret_ty;
     fp -> name = name;
     fp -> locals = new_vec();
     return fp;
@@ -185,9 +186,11 @@ void parse(void){
 
 /* function-definition = "int" ident "(" func-params? ")" "{" compound_stmt */
 Function* function(void){
-    expect("int");
-    char* name = expect_ident();
-    Function* fp = new_func(name);
+    Type *ty = get_type();
+    while(consume("*")){
+        ty = pointer_to(ty);
+    }
+    Function* fp = new_func(expect_ident(), ty);
     current_fp = fp;
     expect("(");
     /* 引数がある場合 */
