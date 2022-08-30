@@ -81,13 +81,11 @@ static void gen_expr(Node* np){
     }
 
     /* 左辺と右辺を計算してスタックに保存 */
-    gen_expr(np -> lhs);
-    push();
     gen_expr(np -> rhs);
     push();
+    gen_expr(np -> lhs);
 
     fprintf(STREAM, "\tpop rdi\n"); //rhs
-    fprintf(STREAM, "\tpop rax\n"); //lhs
 
     switch(np -> kind){
         case ND_ADD:
@@ -108,28 +106,23 @@ static void gen_expr(Node* np){
             break;
 
         case ND_EQ:
-            fprintf(STREAM, "\tcmp rax, rdi\n");
-            fprintf(STREAM, "\tsete al\n"); /* rflagsから必要なフラグをコピー恐らくZF */
-            fprintf(STREAM, "\tmovzb rax, al\n"); /* 上位ビットを0埋め。(eaxへのmov以外、上位ビットは変更されない)*/
-            break;
-
         case ND_NE:
-            fprintf(STREAM, "\tcmp rax, rdi\n");
-            fprintf(STREAM, "\tsetne al\n");
-            fprintf(STREAM, "\tmovzb rax, al\n");
-            break;
-
         case ND_LT:
-            fprintf(STREAM, "\tcmp rax, rdi\n");
-            fprintf(STREAM, "\tsetl al\n");
-            fprintf(STREAM, "\tmovzb rax, al\n");
-            break;
-        
         case ND_LE:
             fprintf(STREAM, "\tcmp rax, rdi\n");
+        if(np -> kind == ND_EQ){
+            fprintf(STREAM, "\tsete al\n");
+        }
+        else if(np -> kind == ND_NE){
+            fprintf(STREAM, "\tsetne al\n");
+        }
+        else if(np -> kind == ND_LT){
+            fprintf(STREAM, "\tsetl al\n");
+        }
+        else if(np -> kind == ND_LE){
             fprintf(STREAM, "\tsetle al\n");
-            fprintf(STREAM, "\tmovzb rax, al\n");
-            break;
+        }
+        fprintf(STREAM, "\tmovzb rax, al\n");
     }    
 }
 

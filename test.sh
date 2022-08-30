@@ -131,11 +131,11 @@ assert 55 'int main() { return fib(9); } int fib(int x) { if (x<=1) return 1; re
 
 assert 3 'int main(){ intx; x=3; return *&x; }'
 assert 3 'int main(){ int x; int y; int z; x=3; y=&x; z=&y; return **z; }'
-assert 5 'int main(){ int x; int y; x=3; y=5; return *(&x-8); }'
-assert 3 'int main(){ int x; int y; x=3; y=5; return *(&y+8); }'
+assert 5 'int main(){ int x; int y; x=3; y=5; return *(&x-1); }'
+assert 3 'int main(){ int x; int y; x=3; y=5; return *(&y+1); }'
 assert 5 'int main(){ int x; int y; x=3; y=&x; *y=5; return x; }'
-assert 7 'int main(){ int x; int y; x=3; y=5; *(&x-8)=7; return y; }'
-assert 7 'int main(){ int x; int y; x=3; y=5; *(&y+8)=7; return x; }'
+assert 7 'int main(){ int x; int y; x=3; y=5; *(&x-1)=7; return y; }'
+assert 7 'int main(){ int x; int y; x=3; y=5; *(&y+1)=7; return x; }'
 
 assert 28 'int main(){ return add8(0,1,2,3,4,5,6,7);} int add8(int a, int b, int c, int d, int e, int f, int g, int h){ return a + b + c + d+ e + f + g + h;}'
 

@@ -343,16 +343,51 @@ static Node* relational(void){
     }
 }
 
+static Node* new_add(Node *lhs, Node *rhs){
+    /* pointer + pointerはエラー */
+    if(is_ptr(lhs) && is_ptr(rhs)){
+        error("error: invalid operand");
+    }
+    /* num + pointer を pointer + num に変更　*/
+    if(is_integer(lhs) && is_ptr(rhs)){
+        Node* tmp = rhs;
+        lhs = rhs;
+        rhs = tmp;
+    }
+    /* pointer + num は pointer + sizeof(type) * numに変更 */
+    if(is_ptr(lhs) && is_integer(rhs)){
+        rhs = new_binary(ND_MUL, new_num_node(8), rhs);
+    }
+    return new_binary(ND_ADD, lhs, rhs);
+}
+
+static Node* new_sub(Node *lhs, Node *rhs){
+    /* num - pointerはエラー */
+    if(is_integer(lhs) && is_ptr(rhs)){
+        error("error: invalid operand");
+    }
+    /* pointer - pointerは要素数(どちらの型も同じことが期待されている。) */
+    if(is_ptr(lhs) && is_ptr(rhs)){
+        lhs = new_binary(ND_SUB, lhs, rhs);
+        return new_binary(ND_MUL, lhs, new_num_node(8));
+    }
+    /* pointer - num は pointer - sizeof(type) * num */
+    if(is_ptr(lhs) && is_integer(rhs)){
+        rhs = new_binary(ND_MUL, new_num_node(8), rhs);
+    }
+    return new_binary(ND_SUB, lhs, rhs);
+}
+
 /* add = mul ("+" mul | "-" mul)* */
 static Node* add(void){
     Node* np = mul();
     for(;;){
         if(consume("+")){
-            np = new_binary(ND_ADD, np, mul());
+            np = new_add(np, mul());
             continue;
         }
         if(consume("-")){
-            np = new_binary(ND_SUB, np, mul());
+            np = new_sub(np, mul());
             continue;
         }
         return np;

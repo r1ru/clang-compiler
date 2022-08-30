@@ -11,6 +11,8 @@
 #define STREAM stdout
 #define ERROR stderr
 
+typedef struct Node Node;
+
 /* utils.c */
 typedef struct{
     void** data; // 汎用
@@ -52,12 +54,14 @@ typedef enum{
 typedef struct Type Type;
 struct Type{
     TypeKind kind;
-    Type *ptr_to; // kindがTY_PTRの時のみ有効
+    Type *base; // kindがTY_PTRの時のみ有効
 };
 
 extern Type *ty_int;
 
 Type* pointer_to(Type *base);
+bool is_integer(Node* np);
+bool is_ptr(Node* np);
 
 /* parse.c */
 typedef struct Obj Obj;
@@ -69,7 +73,6 @@ struct Obj{
 };
 
 typedef struct Function Function;
-typedef struct Node Node;
 
 struct Function{
     Function* next;
