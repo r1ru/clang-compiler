@@ -100,7 +100,6 @@ static void gen_expr(Node* np){
     gen_expr(np -> rhs);
     push();
     gen_expr(np -> lhs);
-
     pop("rdi");
 
     switch(np -> kind){
