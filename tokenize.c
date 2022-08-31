@@ -32,7 +32,7 @@ static bool startswith(char* p1, char* p2){
 
 /* keywordだった場合、keywordの長さを返す。それ以外の時0 */
 static size_t is_keyword(char* p){
-    static char* kw[] = {"return", "if", "else", "while", "for", "int"};
+    static char* kw[] = {"return", "if", "else", "while", "for", "int", "sizeof"};
     for(size_t i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(strncmp(p, kw[i], strlen(kw[i])) == 0){
             return strlen(kw[i]);

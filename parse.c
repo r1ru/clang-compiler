@@ -420,7 +420,7 @@ static Node* mul(void){
 }
 
 /* ("+" | "-")? unaryになっているのは - - xのように連続する可能性があるから。*/
-/* unary    = ("+" | "-" | "&" | "*")? unary
+/* unary    = ("+" | "-" | "&" | "*" | "sizeof" )? unary
             | primary */
 static Node* unary(void){
     Node* np;
@@ -441,6 +441,11 @@ static Node* unary(void){
         np = new_node(ND_DEREF);
         np -> rhs = unary();
         return np;
+    }
+    if(consume("sizeof")){
+        np = unary();
+        add_type(np);
+        return new_num_node(np -> ty -> size);
     }
     return primary();
 }
