@@ -88,7 +88,12 @@ static Obj* new_var(char* name, Type* ty){
     Obj* lvar = calloc(1, sizeof(Obj));
     lvar -> ty = ty;
     lvar -> name = name;
-    current_fp -> stacksiz += ty -> size;
+    if(ty -> kind == TY_ARRAY){
+        current_fp -> stacksiz += ty -> array_size;
+    }
+    else{
+        current_fp -> stacksiz += ty -> size;
+    }
     lvar -> offset = current_fp -> stacksiz; // TOOD: ここをもう少し分かりやすく。
     return lvar;
 }
@@ -162,6 +167,7 @@ static Node* new_lvar_node(Token* tp){
 Function* function(void);
 static Node* stmt(void);
 static Node* compound_stmt(void);
+static void declaration(void); //今はまだ初期化式がないのでvoid
 static Node* expr(void);
 static Node* assign(void);
 static Node* equality(void);
@@ -283,8 +289,7 @@ static Node* compound_stmt(void){
     np -> body = new_vec();
     while(!consume("}")){
         if(is_equal("int")){
-            new_lvar();
-            expect(";");
+            declaration();
         }
         else{
             Node *s = stmt();
@@ -293,6 +298,37 @@ static Node* compound_stmt(void){
         }
     }
     return np;
+}
+
+static Type* array_of(Type *base, int len){
+    Type * ty = calloc(1, sizeof(Type));
+    ty -> kind = TY_ARRAY;
+    ty -> base = base;
+    ty -> array_size = base -> size * len;
+    return ty;
+}
+
+/* declaration = "int" "*"* ident ("[" num "]")? ";" */
+static void declaration(void){
+    Type* ty = get_type();
+    while(consume("*")){
+        ty = pointer_to(ty);
+    }
+    Obj *lvar = find_lvar(token);
+    /* 重複定義はエラー */
+    if(lvar){
+        error_at(token -> str, "error: variable is already defined");
+    }
+    char *name = expect_ident(); //とりあえず変数名を保存
+    /* "["が続くなら配列定義 */
+    if(consume("[")){
+        int len = expect_number();
+        ty = array_of(ty, len);
+        expect("]"); 
+    }
+    /* リストに登録 */
+    vec_push(current_fp -> locals, new_var(name, ty));
+    expect(";");
 }
 
 /* expr = assign */

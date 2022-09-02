@@ -48,14 +48,16 @@ void tokenize(char* p);
 /* type.c */
 typedef enum{
     TY_INT,
-    TY_PTR
+    TY_PTR,
+    TY_ARRAY
 }TypeKind;
 
 typedef struct Type Type;
 struct Type{
     TypeKind kind;
     unsigned int size;
-    Type *base; // kindがTY_PTRの時のみ有効
+    Type *base;
+    size_t array_size; //kindがTY_ARRAYの時のみ有効
 };
 
 extern Type *ty_int;

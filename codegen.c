@@ -17,6 +17,9 @@ static void pop(char* arg){
 
 /* raxに入ってるアドレスにから値を読む。*/
 static void load(Type* ty){
+    if(ty -> kind == TY_ARRAY){
+        return;
+    }
     if(ty -> size == 4){
         fprintf(STREAM, "\tmov eax, [rax]\n");
     }

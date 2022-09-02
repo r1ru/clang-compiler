@@ -66,7 +66,7 @@ void tokenize(char* p){
             continue;
         }
 
-        /* 予約記号の場合 */
+        /* 2文字の予約記号 */
         /* 可変長operator。これを先に置かないと例えば<=が<と=という二つに解釈されてしまう。*/
         if(startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=")) {
             cur = new_token(TK_RESERVED, cur, p, 2);
@@ -74,9 +74,9 @@ void tokenize(char* p){
             continue;
         }
 
-         /* 一文字operatorの場合。
+         /* 一文字の予約記号
         strchrは第一引数で渡された検索対象から第二引数の文字を探してあればその文字へのポインターを、なければNULLを返す。*/
-        if(strchr("+-*/()<>;={},&*", *p)){
+        if(strchr("+-*/()<>;={},&*[]", *p)){
             cur = new_token(TK_RESERVED, cur, p, 1);
             p++;
             continue;
