@@ -15,7 +15,7 @@ bool is_integer(Type *ty){
 }
 
 bool is_ptr(Type *ty){
-    return ty -> kind == TY_PTR;
+    return ty -> base != NULL;
 }
 
 void add_type(Node *node) {

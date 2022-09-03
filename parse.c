@@ -175,6 +175,7 @@ static Node * relational(void);
 static Node* add(void);
 static Node* mul(void);
 static Node* unary(void);
+static Node* postfix(void);
 static Node* primary(void);
 static Node* funcall(Token* tp);
 
@@ -384,6 +385,12 @@ static Node* relational(void){
     }
 }
 
+static Node* new_unary(NodeKind kind, Node *rhs){
+    Node* np = new_node(kind);
+    np -> rhs = rhs;
+    return np;
+}
+
 static Node* new_add(Node *lhs, Node *rhs){
     add_type(lhs);
     add_type(rhs);
@@ -393,7 +400,7 @@ static Node* new_add(Node *lhs, Node *rhs){
     }
     /* num + pointer を pointer + num に変更　*/
     if(is_integer(lhs -> ty) && is_ptr(rhs -> ty)){
-        Node* tmp = rhs;
+        Node* tmp = lhs;
         lhs = rhs;
         rhs = tmp;
     }
@@ -457,7 +464,7 @@ static Node* mul(void){
 
 /* ("+" | "-")? unaryになっているのは - - xのように連続する可能性があるから。*/
 /* unary    = ("+" | "-" | "&" | "*" | "sizeof" )? unary
-            | primary */
+            | postfix */
 static Node* unary(void){
     Node* np;
     /* +はそのまま */
@@ -483,10 +490,21 @@ static Node* unary(void){
         add_type(np);
         return new_num_node(np -> ty -> size);
     }
-    return primary();
+    return postfix();
 }
 
-/* primary  = num 
+/* postfix = primary ("[" expr "]")? */
+static Node* postfix(void){
+    Node *np = primary();
+    if(consume("[")){
+        Node *idx = expr();
+        np = new_unary(ND_DEREF, new_add(np, idx));
+        expect("]");
+    }
+    return np;
+}
+
+/* primary  = num
             | ident
             | funcall
             | "(" expr ")" */
@@ -508,10 +526,8 @@ static Node* primary(void){
         if(consume("(")){
             return funcall(tp);
         }
-        np = new_lvar_node(tp);
-        return np;
+        return new_lvar_node(tp);
     }
-
     /* そうでなければ数値のはず */
     return new_num_node(expect_number());
 }
