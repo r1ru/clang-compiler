@@ -476,14 +476,10 @@ static Node* unary(void){
         return new_binary(ND_SUB, new_num_node(0), unary());
     }
     if(consume("&")){
-        np = new_node(ND_ADDR);
-        np -> rhs = unary();
-        return np;
+        return new_unary(ND_ADDR, unary());
     }
     if(consume("*")){
-        np = new_node(ND_DEREF);
-        np -> rhs = unary();
-        return np;
+        return new_unary(ND_DEREF, unary());
     }
     if(consume("sizeof")){
         np = unary();
