@@ -1,8 +1,8 @@
 #include "9cc.h"
 
-Function* program;
+Vector* program;
 
-static Function* current_fp; // 現在コードを生成している関数へのポインタ
+static Obj *current_func;
 static unsigned int llabel_index; // ローカルラベル用のインデックス
 static char* argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static char* argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
@@ -150,7 +150,7 @@ static void gen_stmt(Node* np){
     
         case ND_RET:
             gen_expr(np -> rhs);
-            fprintf(STREAM, "\tjmp .L.end.%s\n", current_fp -> name);
+            fprintf(STREAM, "\tjmp .L.end.%s\n", current_func -> name);
             return;
 
         case ND_IF:
@@ -219,34 +219,49 @@ static void store_arg(int i, int offset, unsigned int size){
     }
 }
 
+static int align_to(int offset, int align){
+    return (offset + align - 1) / align * align;
+}
+
+static void assign_lvar_offsets(Obj* func){
+    int offset = 0;
+    for(int i = 0; i < func -> locals -> len; i++){
+        Obj* lvar = func -> locals -> data[i];
+        offset += lvar -> ty -> size;
+        lvar -> offset = offset;
+    }
+    func -> stack_size = align_to(offset, 16);
+}
+
 void codegen(void){
     fprintf(STREAM, ".intel_syntax noprefix\n");
-    for (Function *fp = program; fp; fp = fp->next) {
-        current_fp = fp;
+    for(int i = 0; i < program -> len; i++){
+        current_func = program -> data[i];
+        assign_lvar_offsets(current_func);
 
         /* アセンブリの前半を出力 */
-        fprintf(STREAM, ".global %s\n", current_fp -> name);
-        fprintf(STREAM, "%s:\n", current_fp -> name);
+        fprintf(STREAM, ".global %s\n", current_func -> name);
+        fprintf(STREAM, "%s:\n", current_func -> name);
 
         /* プロローグ。 */
         fprintf(STREAM, "\tpush rbp\n");
         fprintf(STREAM, "\tmov rbp, rsp\n");
-        if(fp -> stacksiz != 0){
-            fprintf(STREAM, "\tsub rsp, %u\n", current_fp -> stacksiz);
+        if(current_func -> stack_size != 0){
+            fprintf(STREAM, "\tsub rsp, %u\n", current_func -> stack_size);
         }
 
         unsigned int i;
         /* パラメータをスタック領域にコピー */
-        for(i = 0; i < current_fp -> num_params && i < 6; i++){
-            Obj* lvar = current_fp -> locals -> data[i];
+        for(i = 0; i < current_func -> num_params && i < 6; i++){
+            Obj* lvar = current_func -> locals -> data[i];
             store_arg(i, lvar -> offset, lvar -> ty -> size);
         }
 
         /* コード生成 */
-        gen_stmt(fp -> body);
+        gen_stmt(current_func -> body);
 
         /* エピローグ */
-        fprintf(STREAM, ".L.end.%s:\n", current_fp -> name); // このラベルは関数ごと。
+        fprintf(STREAM, ".L.end.%s:\n", current_func -> name); // このラベルは関数ごと。
         fprintf(STREAM, "\tmov rsp, rbp\n");
         fprintf(STREAM, "\tpop rbp\n");
         fprintf(STREAM, "\tret\n"); /* 最後の式の評価結果が返り値になる。*/   

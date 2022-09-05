@@ -2,7 +2,8 @@
 
 Token *token;
 
-static Function* current_fp; // 現在parseしている関数へのポインタ。
+static Vector *locals;
+static Vector *globals;
 
 /* 次のトークンを読む。(tokenを更新するのはこの関数のみ) */
 static void next_token(void){
@@ -57,16 +58,6 @@ static int expect_number(void){
     return val;
 }
 
-/* TK_IDENT用。トークンが識別子の時はトークンを読み進めて名前を返す。それ以外の時エラー */
-static char* expect_ident(void){
-    if(token -> kind != TK_IDENT){
-        error_at(token -> str, "識別子ではありません。\n");
-    }
-    char* name = get_ident(token);
-    next_token();
-    return name;
-}
-
 /* TK_EOF用。トークンがEOFかどうかを返す。*/
 static bool at_eof(void){
     return token -> kind == TK_EOF;
@@ -74,8 +65,8 @@ static bool at_eof(void){
 
 /* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */
 static Obj *find_lvar(Token* tp) {
-    for(size_t i = 0; i < current_fp -> locals -> len; i++){
-        Obj* lvar = current_fp -> locals -> data[i];
+    for(int i = 0; i < locals -> len; i++){
+        Obj* lvar = locals -> data[i];
         if(strlen(lvar-> name) == tp -> len && !strncmp(lvar -> name, tp -> str, tp -> len)){
             return lvar;
         }
@@ -85,51 +76,27 @@ static Obj *find_lvar(Token* tp) {
 
 /* 新しい変数を作成 */
 static Obj* new_var(char* name, Type* ty){
-    Obj* lvar = calloc(1, sizeof(Obj));
-    lvar -> ty = ty;
-    lvar -> name = name;
-    if(ty -> kind == TY_ARRAY){
-        current_fp -> stacksiz += ty -> array_size;
-    }
-    else{
-        current_fp -> stacksiz += ty -> size;
-    }
-    lvar -> offset = current_fp -> stacksiz; // TOOD: ここをもう少し分かりやすく。
+    Obj* var = calloc(1, sizeof(Obj));
+    var -> ty = ty;
+    var -> name = name;
+    return var;
+}
+
+/* 新しい変数を作成して引数で指定されたVectorに格納。 TODO: 重複定義を落とす*/
+static Obj *new_lvar(char* name, Type *ty){
+    Obj *lvar = new_var(name, ty);
+    vec_push(locals, lvar);
     return lvar;
 }
 
-static Type* get_type(void){
-    if(consume("int")){
-        return ty_int;
-    }
-    error("unknown type");
-}
-
-/* 新しい変数を作成して引数で指定されたVectorに格納。 */
-static void new_lvar(void){
-    Type* ty = get_type();
-    while(consume("*")){
-        ty = pointer_to(ty);
-    }
-    Obj* lvar = find_lvar(token);
-    /* 重複定義はエラー */
-    if(lvar){
-        error_at(token -> str, "error: variable is already defined");
-    }
-    vec_push(current_fp -> locals, new_var(expect_ident(), ty));
-}
-
-/* 新しい関数を作成 */
-static Function* new_func(char* name, Type *ret_ty){
-    Function* fp = calloc(1, sizeof(Function));
-    fp -> ret_ty = ret_ty;
-    fp -> name = name;
-    fp -> locals = new_vec();
-    return fp;
+static Obj *new_gvar(char *name, Type *ty) {
+    Obj *gvar = new_var(name, ty);
+    vec_push(globals, gvar);
+    return gvar;
 }
 
 /* 新しいnodeを作成 */
-static Node* new_node(NodeKind kind){
+static Node *new_node(NodeKind kind){
     Node* np = calloc(1, sizeof(Node));
     np -> kind = kind;
     return np;
@@ -164,7 +131,11 @@ static Node* new_lvar_node(Token* tp){
     return np;
 }
 
-Function* function(void);
+static Type* type_specifier(void);
+static Type* func_params(Type *ret_ty);
+static Type* type_suffix(Type *ty);
+static Type* declarator(Type *ty);
+static Obj *function(void);
 static Node* stmt(void);
 static Node* compound_stmt(void);
 static void declaration(void); //今はまだ初期化式がないのでvoid
@@ -181,36 +152,36 @@ static Node* funcall(Token* tp);
 
 /* program = function-definition* */
 void parse(void){
-    Function head = {};
-    Function* cur = &head;
+    globals = new_vec();
+    program = new_vec();
     while(!at_eof()){
-        cur = cur -> next = function();
+       vec_push(program, function());
     }
-    program = head.next;
-    /* debug info */
-    display_parser_output(program);
 }
 
-/* function-definition = "int" ident "(" func-params? ")" "{" compound_stmt */
-Function* function(void){
-    Type *ty = get_type();
-    while(consume("*")){
-        ty = pointer_to(ty);
+static void create_param_lvars(Vector* params){
+    /* 引数が無ければ返る。*/
+    if(!params){
+        return;
     }
-    Function* fp = new_func(expect_ident(), ty);
-    current_fp = fp;
-    expect("(");
-    /* 引数がある場合 */
-    if(!is_equal(")")){
-        do{ 
-            new_lvar();
-        }while(consume(","));
+    for(int i = 0; i < params -> len; i++){
+        Type *param = params -> data[i];
+        new_lvar(get_ident(param -> name), param);
     }
-    current_fp -> num_params = current_fp -> locals -> len;
-    expect(")");
+}
+
+/* function-definition = type-specifier declarator "{" compound_stmt */
+static Obj *function(void){
+    locals = new_vec();
+    Type *base = type_specifier();
+    Type *ty = declarator(base);  
+    create_param_lvars(ty -> params);
+    Obj* func = new_gvar(get_ident(ty -> name), ty);
+    func -> num_params = locals -> len;
     expect("{");
-    fp -> body = compound_stmt();
-    return fp;    
+    func -> body = compound_stmt();
+    func-> locals = locals;
+    return func;
 }
 
 /* stmt = expr ";" 
@@ -301,34 +272,63 @@ static Node* compound_stmt(void){
     return np;
 }
 
-static Type* array_of(Type *base, int len){
-    Type * ty = calloc(1, sizeof(Type));
-    ty -> kind = TY_ARRAY;
-    ty -> base = base;
-    ty -> array_size = base -> size * len;
+static Type* type_specifier(void){
+    if(consume("int")){
+        return ty_int;
+    }
+    error("unknown type");
+}
+
+/* func-params = (param ("," param)*)? ")"
+ param       = type-specifier declarator */
+static Type* func_params(Type *ret_ty){
+    Type *func = func_type(ret_ty);
+    if(!is_equal(")")){
+        func -> params = new_vec();
+        do{
+            Type *base = type_specifier();
+            Type *ty = declarator(base);
+            vec_push(func -> params, copy_type(ty)); // copyしないと上書きされる可能性があるから。
+        }while(consume(","));   
+    }
+    expect(")");
+    return func;
+}
+
+/* type-suffix  = "(" func-params 
+                | "[" num "]"
+                | ε */ 
+static Type* type_suffix(Type *ty){
+    if(consume("(")){
+        return func_params(ty);
+    }
+    if(consume("[")){
+        int size = expect_number();
+        expect("]"); 
+        return array_of(ty, size);
+    }
     return ty;
 }
 
-/* declaration = "int" "*"* ident ("[" num "]")? ";" */
-static void declaration(void){
-    Type* ty = get_type();
+/* declarator = "*"* ident type-suffix */
+static Type* declarator(Type *ty){
     while(consume("*")){
         ty = pointer_to(ty);
     }
-    Obj *lvar = find_lvar(token);
-    /* 重複定義はエラー */
-    if(lvar){
-        error_at(token -> str, "error: variable is already defined");
+    if(token -> kind != TK_IDENT){
+        error_at(token -> str, "variable name expected\n");
     }
-    char *name = expect_ident(); //とりあえず変数名を保存
-    /* "["が続くなら配列定義 */
-    if(consume("[")){
-        int len = expect_number();
-        ty = array_of(ty, len);
-        expect("]"); 
-    }
-    /* リストに登録 */
-    vec_push(current_fp -> locals, new_var(name, ty));
+    Token *name = token; //一時保存
+    next_token();
+    ty = type_suffix(ty);
+    ty -> name = name;
+}
+
+/* declaration = type-specifier declarator ";" TODO: 重複定義を落とす*/
+static void declaration(void){
+    Type* base = type_specifier();
+    Type* ty = declarator(base);
+    new_lvar(get_ident(ty -> name), ty);
     expect(";");
 }
 

@@ -49,20 +49,26 @@ void tokenize(char* p);
 typedef enum{
     TY_INT,
     TY_PTR,
+    TY_FUNC,
     TY_ARRAY
 }TypeKind;
 
 typedef struct Type Type;
 struct Type{
     TypeKind kind;
-    unsigned int size;
+    int size;
+    Token *name;
     Type *base;
-    size_t array_size; //kindがTY_ARRAYの時のみ有効
+    Type *ret_ty;
+    Vector *params;
 };
 
 extern Type *ty_int;
 
 Type* pointer_to(Type *base);
+Type* array_of(Type *base, int len);
+Type* func_type(Type *ret_ty);
+Type* copy_type(Type *ty);
 bool is_integer(Type *ty);
 bool is_ptr(Type* ty);
 void add_type(Node* np);
@@ -74,18 +80,12 @@ struct Obj{
     Type *ty; // 型情報
     char *name; // 変数の名前
     int offset; // RBPからのオフセット
-};
 
-typedef struct Function Function;
-
-struct Function{
-    Function* next;
-    char* name; 
-    Type *ret_ty; //返り値のタイプ
-    unsigned int num_params; // 仮引数の数
-    Vector* locals;
-    Node* body; // ND_BLOCK
-    unsigned int stacksiz;
+    //function
+    int num_params;
+    Vector *locals;
+    Node *body;
+    int stack_size;
 };
 
 typedef enum{
@@ -135,20 +135,17 @@ struct Node{
 };
 
 extern Token *token;
-extern Function* program; 
 
 void parse(void);
 
 /* codegen.c */
-extern Function* program;
-
 void codegen(void);
+extern Vector *program;
 
 /* debug.c */
 extern FILE* debug;
 
 void display_tokenizer_output(Token* head);
-void display_parser_output(Function* head);
-
+void display_func(Obj *func);
 
 #endif

@@ -23,6 +23,7 @@ void vec_push(Vector* vp, void* elem){
         vp -> capacity *= 2; 
         vp -> data = realloc(vp -> data, 16 * sizeof(void*));
     }
-    vp -> data[vp -> len++] = elem; // 0番目の要素はどうなる?
+    vp -> data[vp -> len] = elem; // 0番目の要素はどうなる?
+    vp -> len ++;
 }
 

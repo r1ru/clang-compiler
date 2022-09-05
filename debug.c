@@ -24,41 +24,19 @@ static void display_token(Token *tp){
     }
 }
 
+void display_func(Obj *func){
+    fprintf(stderr, "%s: %d parameters, %d local variables\n", func -> name, func -> num_params, func -> locals -> len);
+}
+
 static void display_obj(Obj* objp){
     fprintf(debug, "%s  offset: %d\n", objp -> name, objp -> offset);
 }
 
-static void display_func(Function* fp){
-    switch(fp -> ret_ty -> kind){
-        case TY_PTR:
-            fprintf(debug, "TY_PTR  ");
-            break;
-        default:
-            fprintf(debug, "TY_INT  ");
-    }
-    fprintf(debug, "%s  ", fp -> name);
-    fprintf(debug, "%u parameters  ", fp -> num_params);
-    fprintf(debug, "%u statements  ", fp -> body -> body -> len);
-    fprintf(debug, "%u local variables\n", fp -> locals -> len);
-    int i;
-    for(i = 0; i < fp -> locals -> len; i++){
-        Obj* lvar = fp -> locals -> data[i];
-        display_obj(lvar);
-    }
-}
 
 void display_tokenizer_output(Token* head){
     fprintf(debug, "----[Tokenizer Output]----\n");
     for(Token* tp = head; tp; tp = tp -> next){
         display_token(tp);
-    }
-    return; 
-}
-
-void display_parser_output(Function* head){
-    fprintf(debug, "----[Parser Output]----\n");
-    for(Function* fp = head; fp; fp = fp -> next){
-        display_func(fp);
     }
     return; 
 }

@@ -10,6 +10,27 @@ Type* pointer_to(Type *base){
     return ty;
 }
 
+Type* array_of(Type *base, int len){
+    Type * ty = calloc(1, sizeof(Type));
+    ty -> kind = TY_ARRAY;
+    ty -> base = base;
+    ty -> size = base -> size * len;
+    return ty;
+}
+
+Type* func_type(Type *ret_ty){
+    Type *ty = calloc(1, sizeof(Type));
+    ty -> kind = TY_FUNC;
+    ty -> ret_ty = ret_ty;
+    return ty;
+}
+
+Type* copy_type(Type *ty){
+    Type *ret = calloc(1, sizeof(Type));
+    *ret = *ty;
+    return ret;
+}
+
 bool is_integer(Type *ty){
     return ty -> kind == TY_INT;
 }
