@@ -137,11 +137,10 @@ struct Node{
 
 extern Token *token;
 
-void parse(void);
+Vector * parse(void);
 
 /* codegen.c */
-void codegen(void);
-extern Vector *program;
+void codegen(Vector *program);
 
 /* debug.c */
 extern FILE* debug;

@@ -1,7 +1,5 @@
 #include "9cc.h"
 
-Vector* program;
-
 static Obj *current_func;
 static unsigned int llabel_index; // ローカルラベル用のインデックス
 static char* argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
@@ -233,7 +231,7 @@ static void assign_lvar_offsets(Obj* func){
     func -> stack_size = align_to(offset, 16);
 }
 
-void codegen(void){
+void codegen(Vector *program){
     fprintf(STREAM, ".intel_syntax noprefix\n");
     for(int i = 0; i < program -> len; i++){
         current_func = program -> data[i];

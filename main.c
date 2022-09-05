@@ -13,13 +13,14 @@ int main(int argc, char* argv[]){
         return 1;
     }
     setbuf(debug, NULL);
+    
     /* tokenize */
     tokenize(argv[1]);
 
     /* 構文解析 */
-    parse();
+    Vector *program = parse();
 
-    codegen();
+    codegen(program);
 
     /* debug用のファイル記述子をclose */
     if(fclose(debug) == EOF){

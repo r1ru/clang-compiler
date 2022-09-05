@@ -135,7 +135,7 @@ static Type* type_specifier(void);
 static Type* func_params(Type *ret_ty);
 static Type* type_suffix(Type *ty);
 static Type* declarator(Type *ty);
-static Obj *function(void);
+static void function(void);
 static Node* stmt(void);
 static Node* compound_stmt(void);
 static void declaration(void); //今はまだ初期化式がないのでvoid
@@ -151,12 +151,12 @@ static Node* primary(void);
 static Node* funcall(Token* tp);
 
 /* program = function-definition* */
-void parse(void){
+Vector * parse(void){
     globals = new_vec();
-    program = new_vec();
     while(!at_eof()){
-       vec_push(program, function());
+        function();
     }
+    return globals;
 }
 
 static void create_param_lvars(Vector* params){
@@ -171,7 +171,7 @@ static void create_param_lvars(Vector* params){
 }
 
 /* function-definition = type-specifier declarator "{" compound_stmt */
-static Obj *function(void){
+static void function(void){
     locals = new_vec();
     Type *base = type_specifier();
     Type *ty = declarator(base);  
@@ -181,7 +181,6 @@ static Obj *function(void){
     expect("{");
     func -> body = compound_stmt();
     func-> locals = locals;
-    return func;
 }
 
 /* stmt = expr ";" 
