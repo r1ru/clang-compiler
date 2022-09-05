@@ -39,6 +39,10 @@ bool is_ptr(Type *ty){
     return ty -> base != NULL;
 }
 
+bool is_func(Type *ty){
+    return ty -> kind == TY_FUNC;
+}
+
 void add_type(Node *node) {
     if (!node) //有効な値がない可能性があるため。
         return;
@@ -68,7 +72,7 @@ void add_type(Node *node) {
         case ND_FUNCCALL:
             node -> ty = ty_int; // TODO: ここを直す。
             return;
-        case ND_LVAR:
+        case ND_VAR:
             node -> ty = node -> var -> ty;
             return;
         case ND_ADDR:

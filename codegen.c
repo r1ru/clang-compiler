@@ -1,6 +1,6 @@
 #include "9cc.h"
 
-static Obj *current_func;
+static Obj *func; // 現在コードを生成している関数
 static unsigned int llabel_index; // ローカルラベル用のインデックス
 static char* argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static char* argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
@@ -42,9 +42,15 @@ static void gen_expr(Node* np);
 /* アドレスを計算してraxにセット */
 static void gen_addr(Node *np) {
     switch(np -> kind){
-        case ND_LVAR:
-            fprintf(STREAM, "\tlea rax, [rbp -%d]\n", np -> var -> offset); // 変数のアドレスを計算
-            return;
+        case ND_VAR:
+            if(np -> var -> is_global){
+                fprintf(STREAM, "\tlea rax, %s[rip]\n", np -> var -> name);
+                return;
+            }
+            else{
+                fprintf(STREAM, "\tlea rax, [rbp -%d]\n", np -> var -> offset);
+                return;
+            }
         case ND_DEREF:
             gen_expr(np -> rhs);
             return;
@@ -59,7 +65,7 @@ static void gen_expr(Node* np){
             fprintf(STREAM, "\tmov rax, %d\n", np -> val); /* ND_NUMなら入力が一つの数値だったということ。*/
             return;
         
-        case ND_LVAR:
+        case ND_VAR:
             gen_addr(np);
             load(np -> ty);
             return;
@@ -148,7 +154,7 @@ static void gen_stmt(Node* np){
     
         case ND_RET:
             gen_expr(np -> rhs);
-            fprintf(STREAM, "\tjmp .L.end.%s\n", current_func -> name);
+            fprintf(STREAM, "\tjmp .L.end.%s\n", func -> name);
             return;
 
         case ND_IF:
@@ -221,47 +227,75 @@ static int align_to(int offset, int align){
     return (offset + align - 1) / align * align;
 }
 
-static void assign_lvar_offsets(Obj* func){
-    int offset = 0;
-    for(int i = 0; i < func -> locals -> len; i++){
-        Obj* lvar = func -> locals -> data[i];
-        offset += lvar -> ty -> size;
-        lvar -> offset = offset;
+static void assign_lvar_offsets(Vector *globals){
+    for(int i =0; i < globals -> len; i++){
+        Obj *func = globals -> data[i];
+        if(!is_func(func -> ty)){
+            continue;
+        }
+
+        int offset = 0;
+        for(int j = 0; j < func -> locals -> len; j++){
+            Obj* lvar = func -> locals -> data[j];
+            offset += lvar -> ty -> size;
+            lvar -> offset = offset;
+        }
+        func -> stack_size = align_to(offset, 16);
     }
-    func -> stack_size = align_to(offset, 16);
 }
 
-void codegen(Vector *program){
-    fprintf(STREAM, ".intel_syntax noprefix\n");
-    for(int i = 0; i < program -> len; i++){
-        current_func = program -> data[i];
-        assign_lvar_offsets(current_func);
-        display_func(current_func);
+static void emit_data(Vector *globals){
+    fprintf(STREAM, ".data\n");
+    for(int i = 0; i < globals -> len; i++){
+        Obj *gvar = globals -> data[i];
+        if(is_func(gvar -> ty)){
+            continue;
+        }
+        fprintf(STREAM, ".global %s\n", gvar -> name);
+        fprintf(STREAM, "%s:\n", gvar -> name);
+        fprintf(STREAM, "\t.zero %d\n", gvar -> ty -> size);
+    }
+}
+
+static void emit_text(Vector *globals){
+    fprintf(STREAM, ".text\n");
+    for(int i = 0; i < globals -> len; i++){
+        func = globals -> data[i];
+        if(!is_func(func -> ty)){
+            continue;
+        }
         /* アセンブリの前半を出力 */
-        fprintf(STREAM, ".global %s\n", current_func -> name);
-        fprintf(STREAM, "%s:\n", current_func -> name);
+        fprintf(STREAM, ".global %s\n", func -> name);
+        fprintf(STREAM, "%s:\n", func -> name);
 
         /* プロローグ。 */
         fprintf(STREAM, "\tpush rbp\n");
         fprintf(STREAM, "\tmov rbp, rsp\n");
-        if(current_func -> stack_size != 0){
-            fprintf(STREAM, "\tsub rsp, %u\n", current_func -> stack_size);
+        if(func -> stack_size != 0){
+            fprintf(STREAM, "\tsub rsp, %u\n", func -> stack_size);
         }
 
-        unsigned int i;
         /* パラメータをスタック領域にコピー */
-        for(i = 0; i < current_func -> num_params && i < 6; i++){
-            Obj* lvar = current_func -> locals -> data[i];
-            store_arg(i, lvar -> offset, lvar -> ty -> size);
+        for(int j = 0; j < func -> num_params && j < 6; j++){
+            Obj* lvar = func -> locals -> data[j];
+            store_arg(j, lvar -> offset, lvar -> ty -> size);
         }
 
         /* コード生成 */
-        gen_stmt(current_func -> body);
+        gen_stmt(func -> body);
 
         /* エピローグ */
-        fprintf(STREAM, ".L.end.%s:\n", current_func -> name); // このラベルは関数ごと。
+        fprintf(STREAM, ".L.end.%s:\n", func -> name); // このラベルは関数ごと。
         fprintf(STREAM, "\tmov rsp, rbp\n");
         fprintf(STREAM, "\tpop rbp\n");
         fprintf(STREAM, "\tret\n"); /* 最後の式の評価結果が返り値になる。*/   
     }
+}
+
+void codegen(Vector *globals){
+    fprintf(STREAM, ".intel_syntax noprefix\n");
+    assign_lvar_offsets(globals);
+    display_globals(globals);
+    emit_data(globals);
+    emit_text(globals);
 }

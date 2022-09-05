@@ -74,19 +74,35 @@ static void type_info(Type *ty){
     }
 }
 
-static void display_obj(Obj *obj){
+static void display_obj(Obj *obj, bool is_global){
     type_info(obj -> ty);
-    fprintf(debug, " %s offset: %d\n", obj -> name, obj -> offset);
+    fprintf(debug, " %s", obj -> name);
+    if(!is_global){
+        fprintf(debug, " offset: %d", obj -> offset);
+    }
+    fprintf(debug, "\n");
 }
 
-void display_func(Obj *func){
+static void display_func(Obj *func){
     type_info(func -> ty);
     fprintf(debug, " %s:\n", func -> name);
     fprintf(debug, "\t[%d local variables]\n", func -> locals -> len);
     for(int i =0; i < func -> locals -> len; i++){
         Obj *lvar = func -> locals -> data[i];
         fprintf(debug, "\t");
-        display_obj(lvar);
+        display_obj(lvar, false);
+    }
+}
+
+void display_globals(Vector *globals){
+    fprintf(debug, "----[Globals]----\n");
+    for(int i = 0; i < globals -> len; i++){
+        Obj *global = globals -> data[i];
+        if(is_func(global -> ty)){
+            display_func(global);
+            continue;;
+        }
+        display_obj(global, true);
     }
 }
 

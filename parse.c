@@ -64,11 +64,18 @@ static bool at_eof(void){
 }
 
 /* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */
-static Obj *find_lvar(Token* tp) {
-    for(int i = 0; i < locals -> len; i++){
-        Obj* lvar = locals -> data[i];
+static Obj *find_var(Token* tp) {
+    int i;
+    for(i = 0; i < locals -> len; i++){
+        Obj *lvar = locals -> data[i];
         if(strlen(lvar-> name) == tp -> len && !strncmp(lvar -> name, tp -> str, tp -> len)){
             return lvar;
+        }
+    }
+    for(i = 0; i < globals -> len; i++){
+        Obj *gvar = globals -> data[i];
+        if(strlen(gvar-> name) == tp -> len && !strncmp(gvar -> name, tp -> str, tp -> len)){
+            return gvar;
         }
     }
     return NULL;
@@ -91,6 +98,7 @@ static Obj *new_lvar(char* name, Type *ty){
 
 static Obj *new_gvar(char *name, Type *ty) {
     Obj *gvar = new_var(name, ty);
+    gvar -> is_global = true;
     vec_push(globals, gvar);
     return gvar;
 }
@@ -117,17 +125,17 @@ static Node* new_num_node(int val){
     return np;
 }
 
-/* ND_LVARを作成 */
-static Node* new_lvar_node(Token* tp){
-    Node* np = new_node(ND_LVAR);
+/* ND_VARを作成 */
+static Node* new_var_node(Token* tp){
+    Node* np = new_node(ND_VAR);
 
     /* ローカル変数が既に登録されているか検索 */
-    Obj* lvar = find_lvar(tp);
+    Obj* var = find_var(tp);
     /* されていなければエラー */
-    if(!lvar){
+    if(!var){
         error_at(tp -> str, "error: undefined variable");
     }
-    np -> var = lvar; 
+    np -> var = var; 
     return np;
 }
 
@@ -135,7 +143,7 @@ static Type* type_specifier(void);
 static Type* func_params(Type *ret_ty);
 static Type* type_suffix(Type *ty);
 static Type* declarator(Type *ty);
-static void function(void);
+static void function(Type *ty);
 static Node* stmt(void);
 static Node* compound_stmt(void);
 static void declaration(void); //今はまだ初期化式がないのでvoid
@@ -150,11 +158,20 @@ static Node* postfix(void);
 static Node* primary(void);
 static Node* funcall(Token* tp);
 
-/* program = function-definition* */
+/* program  = type-specifier declarator ";"
+            | type-specifier declarator body */
 Vector * parse(void){
     globals = new_vec();
     while(!at_eof()){
-        function();
+        Type *base = type_specifier();
+        Type *ty = declarator(base);
+        if(is_func(ty)){
+            function(ty);
+        }
+        else{
+            new_gvar(get_ident(ty -> name), ty);
+            expect(";");
+        }
     }
     return globals;
 }
@@ -170,11 +187,9 @@ static void create_param_lvars(Vector* params){
     }
 }
 
-/* function-definition = type-specifier declarator "{" compound_stmt */
-static void function(void){
+/* function = "{" compound_stmt */
+static void function(Type *ty){
     locals = new_vec();
-    Type *base = type_specifier();
-    Type *ty = declarator(base);  
     create_param_lvars(ty -> params);
     Obj* func = new_gvar(get_ident(ty -> name), ty);
     func -> num_params = locals -> len;
@@ -521,7 +536,7 @@ static Node* primary(void){
         if(consume("(")){
             return funcall(tp);
         }
-        return new_lvar_node(tp);
+        return new_var_node(tp);
     }
     /* そうでなければ数値のはず */
     return new_num_node(expect_number());

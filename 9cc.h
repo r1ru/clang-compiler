@@ -72,6 +72,7 @@ Type* func_type(Type *ret_ty);
 Type* copy_type(Type *ty);
 bool is_integer(Type *ty);
 bool is_ptr(Type* ty);
+bool is_func(Type *ty);
 void add_type(Node* np);
 
 /* parse.c */
@@ -81,6 +82,8 @@ struct Obj{
     Type *ty; // 型情報
     char *name; // 変数の名前
     int offset; // RBPからのオフセット
+
+    bool is_global;
 
     //function
     int num_params;
@@ -100,7 +103,7 @@ typedef enum{
     ND_LT, // < less than
     ND_LE, // <= less than or equal to
     ND_ASSIGN, // =
-    ND_LVAR, // local variable
+    ND_VAR, // variable
     ND_NUM,
     ND_RET, // return
     ND_IF, // if
@@ -132,7 +135,7 @@ struct Node{
 
     Vector* body; // for compound statement
     int val; // ND_NUM用
-    Obj* var; // ND_LVAL用
+    Obj* var; // ND_VAR用
 };
 
 extern Token *token;
@@ -146,6 +149,6 @@ void codegen(Vector *program);
 extern FILE* debug;
 
 void check_tokenizer_output(Token* head);
-void display_func(Obj *func);
+void display_globals(Vector *globals);
 
 #endif
