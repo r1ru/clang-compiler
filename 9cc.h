@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #define STREAM stdout
 #define ERROR stderr
@@ -145,7 +146,7 @@ extern Vector *program;
 /* debug.c */
 extern FILE* debug;
 
-void display_tokenizer_output(Token* head);
+void check_tokenizer_output(Token* head);
 void display_func(Obj *func);
 
 #endif

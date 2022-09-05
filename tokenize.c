@@ -112,5 +112,5 @@ void tokenize(char* p){
     token = head.next;
 
     /* debug info */
-    display_tokenizer_output(token);
+    check_tokenizer_output(token);
 }

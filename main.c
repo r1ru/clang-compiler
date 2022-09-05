@@ -12,7 +12,7 @@ int main(int argc, char* argv[]){
         perror("fopen");
         return 1;
     }
-
+    setbuf(debug, NULL);
     /* tokenize */
     tokenize(argv[1]);
 

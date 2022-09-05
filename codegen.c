@@ -238,7 +238,7 @@ void codegen(void){
     for(int i = 0; i < program -> len; i++){
         current_func = program -> data[i];
         assign_lvar_offsets(current_func);
-
+        display_func(current_func);
         /* アセンブリの前半を出力 */
         fprintf(STREAM, ".global %s\n", current_func -> name);
         fprintf(STREAM, "%s:\n", current_func -> name);
