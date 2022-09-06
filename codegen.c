@@ -98,8 +98,8 @@ static void gen_expr(Node* np){
             return;
         
         case ND_DEREF:
-            gen_expr(np -> rhs); //なぜ式?
-            fprintf(STREAM, "\tmov rax, [rax]\n");
+            gen_expr(np -> rhs);
+            load(np -> ty);
             return;
     }
 
