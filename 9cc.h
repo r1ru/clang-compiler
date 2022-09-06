@@ -49,6 +49,7 @@ void tokenize(char* p);
 /* type.c */
 typedef enum{
     TY_INT,
+    TY_CHAR,
     TY_PTR,
     TY_FUNC,
     TY_ARRAY
@@ -65,6 +66,7 @@ struct Type{
 };
 
 extern Type *ty_int;
+extern Type *ty_char;
 
 Type* pointer_to(Type *base);
 Type* array_of(Type *base, int len);

@@ -1,6 +1,7 @@
 #include "9cc.h"
 
 Type *ty_int = &(Type){TY_INT, 4};
+Type *ty_char =&(Type){TY_CHAR, 1};
 
 Type* pointer_to(Type *base){
     Type *ty = calloc(1, sizeof(Type));
@@ -32,7 +33,7 @@ Type* copy_type(Type *ty){
 }
 
 bool is_integer(Type *ty){
-    return ty -> kind == TY_INT;
+    return ty -> kind == TY_INT || ty -> kind == TY_CHAR;
 }
 
 bool is_ptr(Type *ty){

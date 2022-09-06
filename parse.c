@@ -269,12 +269,16 @@ static Node* stmt(void){
     return np;
 }
 
+static bool is_typename(void){
+    return is_equal("int") || is_equal("char");
+}
+
 /* compound-stmt = (declaration | stmt)* "}" */
 static Node* compound_stmt(void){
     Node *np = new_node(ND_BLOCK);
     np -> body = new_vec();
     while(!consume("}")){
-        if(is_equal("int")){
+        if(is_typename()){
             declaration();
         }
         else{
@@ -289,6 +293,9 @@ static Node* compound_stmt(void){
 static Type* type_specifier(void){
     if(consume("int")){
         return ty_int;
+    }
+    if(consume("char")){
+        return ty_char;
     }
     error("unknown type");
 }

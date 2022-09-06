@@ -4,6 +4,7 @@ static Obj *func; // 現在コードを生成している関数
 static unsigned int llabel_index; // ローカルラベル用のインデックス
 static char* argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static char* argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
+static char* argreg8[] = {"dil", "sil", "dl", "cl", "r8b", "r9b" };
 
 static void push(void){
     fprintf(STREAM, "\tpush rax\n");
@@ -18,23 +19,29 @@ static void load(Type* ty){
     if(ty -> kind == TY_ARRAY){
         return;
     }
+    if(ty -> size == 1){
+        fprintf(STREAM, "\tmovzx eax, BYTE PTR [rax]\n"); 
+        return;
+    }    
     if(ty -> size == 4){
         fprintf(STREAM, "\tmov eax, [rax]\n");
+        return;
     }
-    else{
-        fprintf(STREAM, "\tmov rax, [rax]\n");
-    }
+    fprintf(STREAM, "\tmov rax, [rax]\n");
 }
 
 /* スタックに積まれているアドレスに値を格納。*/
 static void store(Type *ty){
     pop("rdi");
+    if(ty -> size == 1){
+        fprintf(STREAM, "\tmov [rdi], al\n");
+        return;
+    }
     if(ty -> size == 4){
         fprintf(STREAM, "\tmov [rdi], eax\n");
+        return;
     }
-    else{
-       fprintf(STREAM, "\tmov [rdi], rax\n"); 
-    }
+    fprintf(STREAM, "\tmov [rdi], rax\n"); 
 }
 
 static void gen_expr(Node* np);
@@ -215,12 +222,15 @@ static void gen_stmt(Node* np){
 }
 
 static void store_arg(int i, int offset, unsigned int size){
+    if(size == 1){
+        fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg8[i]);
+        return;
+    }
     if(size == 4){
         fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg32[i]);
+        return;
     }
-    else{
-         fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg64[i]);
-    }
+    fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg64[i]);
 }
 
 static int align_to(int offset, int align){

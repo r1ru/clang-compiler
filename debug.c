@@ -28,6 +28,8 @@ static char* base_type(Type *ty){
     switch(ty -> kind){
         case TY_INT:
             return "int";
+        case TY_CHAR:
+            return "char";
         default:
             error("unknown type");
     }
@@ -44,6 +46,10 @@ static void type_info(Type *ty){
     Type *t;
     switch(ty -> kind){
         case TY_INT:
+            fprintf(debug, "%s", base_type(ty));
+            return;
+        
+        case TY_CHAR:
             fprintf(debug, "%s", base_type(ty));
             return;
 
@@ -86,7 +92,7 @@ static void display_obj(Obj *obj, bool is_global){
 static void display_func(Obj *func){
     type_info(func -> ty);
     fprintf(debug, " %s:\n", func -> name);
-    fprintf(debug, "\t[%d local variables]\n", func -> locals -> len);
+    fprintf(debug, "\t[%d local variables, %d bytes stack]\n", func -> locals -> len, func -> stack_size);
     for(int i =0; i < func -> locals -> len; i++){
         Obj *lvar = func -> locals -> data[i];
         fprintf(debug, "\t");
