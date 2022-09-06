@@ -11,15 +11,15 @@ static void next_token(void){
 }
 
 /* トークンの記号が期待したもののときtrue。それ以外の時false */
-static bool is_equal(char* op){
-    if(strlen(op) != token -> len || strncmp(op, token -> str, token -> len))
+static bool is_equal(Token *tok, char *op){
+    if(strlen(op) != tok -> len || strncmp(op, tok -> str, tok -> len))
         return false;
     return true;
 }
 
 /* トークンが期待した記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
 static bool consume(char* op){
-    if(is_equal(op)){
+    if(is_equal(token, op)){
         next_token();
         return true;
     }
@@ -246,15 +246,15 @@ static Node* stmt(void){
     if(consume("for")){
         expect("(");
         np = new_node(ND_FOR);
-        if(!is_equal(";")){
+        if(!is_equal(token, ";")){
             np -> init = expr();
         }
         expect(";");
-        if(!is_equal(";")){
+        if(!is_equal(token, ";")){
             np -> cond = expr();
         }
         expect(";");
-        if(!is_equal(")")){
+        if(!is_equal(token, ")")){
             np -> inc = expr();
         }
         expect(")");
@@ -270,7 +270,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(void){
-    return is_equal("int") || is_equal("char");
+    return is_equal(token, "int") || is_equal(token, "char");
 }
 
 /* compound-stmt = (declaration | stmt)* "}" */
@@ -304,7 +304,7 @@ static Type* type_specifier(void){
  param       = type-specifier declarator */
 static Type* func_params(Type *ret_ty){
     Type *func = func_type(ret_ty);
-    if(!is_equal(")")){
+    if(!is_equal(token, ")")){
         func -> params = new_vec();
         do{
             Type *base = type_specifier();
@@ -555,7 +555,7 @@ static Node* funcall(Token* tp){
     np -> funcname = get_ident(tp);
 
     /* 引数がある場合 */
-    if(!is_equal(")")){
+    if(!is_equal(token, ")")){
         np -> args = new_vec();
         do{
             vec_push(np->args, expr());
