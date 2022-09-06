@@ -32,14 +32,8 @@ static char* get_ident(Token* tp){
     return strncpy(name, tp -> str, tp -> len);
 }
 
-/* TK_IDENT用。トークンが識別子のときはトークンを読み進めてトークンへのポインタを返す。それ以外のときはNULLを返す。*/
-static Token* consume_ident(void){
-    if(token -> kind != TK_IDENT) {
-       return NULL;
-    }
-    Token* tp = token;
-    next_token();
-    return tp;
+static bool is_ident(void){
+    return token -> kind == TK_IDENT;
 }
 
 /* トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
@@ -69,12 +63,14 @@ static Obj *find_var(Token* tp) {
     for(i = 0; i < locals -> len; i++){
         Obj *lvar = locals -> data[i];
         if(strlen(lvar-> name) == tp -> len && !strncmp(lvar -> name, tp -> str, tp -> len)){
+            next_token();
             return lvar;
         }
     }
     for(i = 0; i < globals -> len; i++){
         Obj *gvar = globals -> data[i];
         if(strlen(gvar-> name) == tp -> len && !strncmp(gvar -> name, tp -> str, tp -> len)){
+            next_token();
             return gvar;
         }
     }
@@ -126,15 +122,8 @@ static Node* new_num_node(int val){
 }
 
 /* ND_VARを作成 */
-static Node* new_var_node(Token* tp){
+static Node* new_var_node(Obj *var){
     Node* np = new_node(ND_VAR);
-
-    /* ローカル変数が既に登録されているか検索 */
-    Obj* var = find_var(tp);
-    /* されていなければエラー */
-    if(!var){
-        error_at(tp -> str, "error: undefined variable");
-    }
     np -> var = var; 
     return np;
 }
@@ -156,7 +145,7 @@ static Node* mul(void);
 static Node* unary(void);
 static Node* postfix(void);
 static Node* primary(void);
-static Node* funcall(Token* tp);
+static Node* funcall(void);
 
 /* program  = type-specifier declarator ";"
             | type-specifier declarator body */
@@ -527,7 +516,6 @@ static Node* postfix(void){
             | "(" expr ")" */
 static Node* primary(void){
     Node* np;
-    Token* tp;
 
     /* "("ならexprを呼ぶ */
     if(consume("(")){
@@ -536,24 +524,28 @@ static Node* primary(void){
         return np;
     }
 
-    /* 識別子トークンの場合 */
-    tp = consume_ident();
-    if(tp){
-        /* ()が続くなら関数呼び出し */
-        if(consume("(")){
-            return funcall(tp);
+    if(is_ident()){
+        if(is_equal(token -> next, "(")){
+            return funcall();
         }
-        return new_var_node(tp);
+        Obj *var = find_var(token);
+        if(!var){
+            error_at(token -> str, "undefined variable");
+        }
+        return new_var_node(var);
     }
+
     /* そうでなければ数値のはず */
     return new_num_node(expect_number());
 }
 
 /* funcall = ident "(" func-args? ")" */
-static Node* funcall(Token* tp){
+static Node* funcall(void){
     Node* np = new_node(ND_FUNCCALL);
-    np -> funcname = get_ident(tp);
-
+    np -> funcname = get_ident(token);
+    next_token();
+    
+    expect("(");
     /* 引数がある場合 */
     if(!is_equal(token, ")")){
         np -> args = new_vec();
