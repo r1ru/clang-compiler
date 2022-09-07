@@ -87,7 +87,7 @@ static void gen_expr(Node* np){
         case ND_FUNCCALL:
             /* 引数があれば */
             if(np -> args){
-                int i; // ここはintにしないとバグる。0 <= -1の評価が必要になるため。
+                int i;
                 for(i= np -> args -> len - 1; 0 <= i; i--){
                     gen_expr(np -> args -> data[i]); // 引数を逆順にスタックに積む。こうすると6つ以上の引数をとる関数呼び出を実現するのが簡単になる。
                     push();
@@ -211,7 +211,7 @@ static void gen_stmt(Node* np){
             return;
         
         case ND_BLOCK:
-             for(unsigned int i = 0; i < np -> body -> len; i++){
+             for(int i = 0; i < np -> body -> len; i++){
                 gen_stmt(np -> body -> data[i]);
             }
             return;

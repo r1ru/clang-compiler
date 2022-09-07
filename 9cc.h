@@ -17,8 +17,8 @@ typedef struct Node Node;
 /* utils.c */
 typedef struct{
     void** data; // 汎用
-    unsigned int capacity;
-    unsigned int len;
+    int capacity;
+    int len;
 }Vector;
 
 void error(char *fmt, ...);

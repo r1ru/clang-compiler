@@ -75,7 +75,7 @@ void add_type(Node *node) {
         case ND_FUNCCALL:
             /* 引数があれば */
             if(node -> args){
-                for(unsigned int i = 0; i < node -> args -> len; i++){
+                for(int i = 0; i < node -> args -> len; i++){
                     Node* n = node -> args -> data[i];
                     add_type(n);
                 }   
@@ -96,7 +96,7 @@ void add_type(Node *node) {
             node -> ty = node -> rhs -> ty -> base;
             return;
         case ND_BLOCK:
-            for(unsigned int i = 0; i < node -> body -> len; i++){
+            for(int i = 0; i < node -> body -> len; i++){
                 Node* n = node -> body -> data[i];
                 add_type(n);
             }   
