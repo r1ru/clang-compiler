@@ -70,8 +70,17 @@ void add_type(Node *node) {
         case ND_LT:
         case ND_LE:
         case ND_NUM:
+            node -> ty = ty_int;
+            return;
         case ND_FUNCCALL:
-            node -> ty = ty_int; // TODO: ここを直す。
+            /* 引数があれば */
+            if(node -> args){
+                for(unsigned int i = 0; i < node -> args -> len; i++){
+                    Node* n = node -> args -> data[i];
+                    add_type(n);
+                }   
+            }
+            node -> ty = ty_int;// TODO: ここを直す。
             return;
         case ND_VAR:
             node -> ty = node -> var -> ty;

@@ -18,6 +18,10 @@ static void display_token(Token *tp){
             fprintf(debug, "TK_NUM, val: %d\n", tp -> val);
             return;
 
+        case TK_STR:   
+            fprintf(debug, "TK_STR, val: %.*s\n", tp -> len, tp -> str);
+            return; 
+
         case TK_EOF:
             fprintf(debug, "TK_EOF\n");
             return;
@@ -83,6 +87,9 @@ static void type_info(Type *ty){
 static void display_obj(Obj *obj, bool is_global){
     type_info(obj -> ty);
     fprintf(debug, " %s", obj -> name);
+    if(obj -> init_data){
+        fprintf(debug, " init_data: \"%s\"", obj -> init_data);
+    }
     if(!is_global){
         fprintf(debug, " offset: %d", obj -> offset);
     }

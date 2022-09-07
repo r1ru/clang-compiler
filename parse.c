@@ -26,6 +26,11 @@ static bool consume(char* op){
     return false;
 }
 
+static char* strndup(char* str, int len){
+    char *s = calloc(1, len + 1);
+    return strncpy(s, str, len);
+}
+
 /* トークンの名前をバッファに格納してポインタを返す。strndupと同じ動作。 */
 static char* get_ident(Token* tp){
     char* name = calloc(1, tp -> len + 1); // null終端するため。
@@ -34,6 +39,10 @@ static char* get_ident(Token* tp){
 
 static bool is_ident(void){
     return token -> kind == TK_IDENT;
+}
+
+static bool is_str(voud){
+    return token -> kind == TK_STR;
 }
 
 /* トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
@@ -97,6 +106,21 @@ static Obj *new_gvar(char *name, Type *ty) {
     gvar -> is_global = true;
     vec_push(globals, gvar);
     return gvar;
+}
+
+static char* new_unique_name(void){
+    static int idx;
+    char *buf = calloc(1, 10);
+    sprintf(buf, ".LC%d", idx);
+    idx++;
+    return buf;
+}
+
+static Obj *new_string_literal(Token *tok){
+    Type *ty = array_of(ty_char, tok -> len + 1); // null文字があるので+1
+    Obj *str = new_gvar(new_unique_name(), ty);
+    str -> init_data = strndup(tok -> str, tok -> len);
+    return str;
 }
 
 /* 新しいnodeを作成 */
@@ -512,6 +536,7 @@ static Node* postfix(void){
 
 /* primary  = num
             | ident
+            | str
             | funcall
             | "(" expr ")" */
 static Node* primary(void){
@@ -533,6 +558,12 @@ static Node* primary(void){
             error_at(token -> str, "undefined variable");
         }
         return new_var_node(var);
+    }
+
+    if(is_str()){
+        Obj * str = new_string_literal(token);
+        next_token();
+        return new_var_node(str);
     }
 
     /* そうでなければ数値のはず */

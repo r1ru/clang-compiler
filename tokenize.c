@@ -48,7 +48,7 @@ void tokenize(char* p){
     char *q;
 
     input = p;
-
+    
     while(*p){
         /* is~関数は偽のときに0を、真の時に0以外を返す。*/
         /* spaceだった場合は無視。 */
@@ -98,6 +98,19 @@ void tokenize(char* p){
             }
             cur -> len = p - q; /* 長さを記録 */
             
+            continue;
+        }
+
+        /* 文字列リテラルの場合 */
+        if(*p == '"'){
+            p++; // '"'を読み飛ばす
+            cur = new_token(TK_STR, cur, p, 0);
+            q = p;
+            while(*p != '"'){
+                p++;
+            }
+            cur -> len  = p - q;
+            p++; // '"'を読み飛ばす
             continue;
         }
 

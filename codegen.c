@@ -97,6 +97,7 @@ static void gen_expr(Node* np){
                     pop(argreg64[i]); // レジスタにストア(前から順番に。)
                 }
             }
+            fprintf(STREAM, "\tmov rax, 0\n"); // 浮動小数点の引数の個数
             fprintf(STREAM, "\tcall %s\n", np -> funcname);
             return;
         
@@ -262,8 +263,13 @@ static void emit_data(Vector *globals){
             continue;
         }
         fprintf(STREAM, ".global %s\n", gvar -> name);
-        fprintf(STREAM, "%s:\n", gvar -> name);
-        fprintf(STREAM, "\t.zero %d\n", gvar -> ty -> size);
+        fprintf(STREAM, "%s:\n", gvar -> name); 
+        if(gvar -> init_data){
+            fprintf(STREAM, "\t.string \"%s\"\n", gvar -> init_data);
+        }
+        else{
+            fprintf(STREAM, "\t.zero %d\n", gvar -> ty -> size);
+        }
     }
 }
 

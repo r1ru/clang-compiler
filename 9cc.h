@@ -32,6 +32,7 @@ typedef enum{
     TK_RESERVED,
     TK_IDENT, // 識別子
     TK_NUM,
+    TK_STR,
     TK_EOF
 }TokenKind;
 
@@ -85,6 +86,7 @@ struct Obj{
     char *name; // 変数の名前
     int offset; // RBPからのオフセット
 
+    char *init_data; // string literal
     bool is_global;
 
     //function
