@@ -1,18 +1,50 @@
 #include "9cc.h"
 
-static char* input;
+static char *current_path;
+static char *current_input;
 
 /* エラー表示用の関数 */
-void error_at(char *loc, char *fmt, ...){
+void error(char *fmt, ...){
   va_list ap;
   va_start(ap, fmt);
-  int pos = loc - input; // ポインタの引き算は要素数を返す。
-  fprintf(ERROR, "%s\n", input);
-  fprintf(ERROR, "%*s", pos, " "); // pos個の空白を表示
-  fprintf(ERROR, "^ ");
-  vfprintf(ERROR, fmt, ap); 
-  fprintf(ERROR, "\n");
+  vfprintf(stderr, fmt, ap);
+  fprintf(stderr, "\n");
   exit(1);
+}
+
+/* エラー表示用の関数 */
+void error_at(char *loc, char* fmt, ...){
+    va_list ap;
+    va_start(ap, fmt);
+    char *start = loc;
+    /* locが含まれる行の開始地点と終了地点を取得 */
+    while(current_input < start && start[-1] != '\n'){
+        start--;
+    }
+    char *end = loc;
+    while(*end != '\n'){
+        end++;
+    }
+
+    int line_num = 1;
+
+    /* pointerをstartまで移動。\nが出てくるたびにline_numを更新 */
+    for(char *p = current_input; p < start; p++){
+        if(*p == '\n'){
+            line_num++;
+        }
+    }
+
+    /* エラーメッセージを表示 */
+    int indent = fprintf(stderr, "%s:%d: ", current_path, line_num);
+    fprintf(ERROR, "%.*s\n", (int)(end - start), start);
+
+    int pos = loc - start + indent; // ポインタの引き算は要素数を返す。
+    fprintf(ERROR, "%*s", pos, " "); // pos個の空白を表示
+    fprintf(ERROR, "^ ");
+    vfprintf(ERROR, fmt, ap); 
+    fprintf(ERROR, "\n");
+    exit(1);
 }
 
 /* 新しいtokenを作成してcurにつなげる。*/
@@ -42,12 +74,13 @@ static size_t is_keyword(char* p){
 }
 
 /* 入力文字列をトークナイズしてそれを返す */
-void tokenize(char* p){
+void tokenize(char *path, char* p){
     Token head; /* これは無駄になるがスタック領域なのでオーバーヘッドは0に等しい */
     Token* cur = &head;
     char *q;
 
-    input = p;
+    current_path = path;
+    current_input = p;
     
     while(*p){
         /* is~関数は偽のときに0を、真の時に0以外を返す。*/

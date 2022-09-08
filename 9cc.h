@@ -22,7 +22,6 @@ typedef struct{
     int len;
 }Vector;
 
-void error(char *fmt, ...);
 Vector* new_vec(void);
 void vec_push(Vector* vp, void* elem);
 
@@ -45,8 +44,9 @@ struct Token{
     int len; // トークンの長さ
 };
 
-void error_at(char *loc, char *fmt, ...);
-void tokenize(char* p);
+void error(char *fmt, ...);
+void error_at(char *loc, char* fmt, ...);
+void tokenize(char *path, char* p);
 
 /* type.c */
 typedef enum{

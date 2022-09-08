@@ -48,7 +48,7 @@ int main(int argc, char* argv[]){
     char *buf = read_file(argv[1]);
     
     /* tokenize */
-    tokenize(buf);
+    tokenize(argv[1], buf);
 
     /* 構文解析 */
     Vector *program = parse();

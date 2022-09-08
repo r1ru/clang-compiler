@@ -41,7 +41,7 @@ static bool is_ident(void){
     return token -> kind == TK_IDENT;
 }
 
-static bool is_str(voud){
+static bool is_str(void){
     return token -> kind == TK_STR;
 }
 
@@ -310,7 +310,7 @@ static Type* type_specifier(void){
     if(consume("char")){
         return ty_char;
     }
-    error("unknown type");
+    error_at(token -> str, "unknown type");
 }
 
 /* func-params = (param ("," param)*)? ")"
@@ -430,7 +430,7 @@ static Node* new_add(Node *lhs, Node *rhs){
     add_type(rhs);
     /* pointer + pointerはエラー */
     if(is_ptr(lhs -> ty) && is_ptr(rhs -> ty)){
-        error("error: invalid operand");
+        error("error: invalid operand"); // TODO ここを改良
     }
     /* num + pointer を pointer + num に変更　*/
     if(is_integer(lhs -> ty) && is_ptr(rhs -> ty)){
@@ -450,7 +450,7 @@ static Node* new_sub(Node *lhs, Node *rhs){
     add_type(rhs);
     /* num - pointerはエラー */
     if(is_integer(lhs -> ty) && is_ptr(rhs -> ty)){
-        error("error: invalid operand");
+        error("error: invalid operand");// TODO ここを改良
     }
     /* pointer - pointerは要素数(どちらの型も同じことが期待されている。) */
     if(is_ptr(lhs -> ty) && is_ptr(rhs -> ty)){
