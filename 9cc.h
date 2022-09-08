@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <errno.h>
 
 #define STREAM stdout
 #define ERROR stderr
