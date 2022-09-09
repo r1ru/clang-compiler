@@ -152,13 +152,15 @@ void tokenize(char *path, char* p){
             continue;
         }
 
-        /* 文字列リテラルの場合 */
+        /* 文字列リテラルの場合*/
         if(*p == '"'){
             p++; // '"'を読み飛ばす
             cur = new_token(TK_STR, cur, p, 0);
             q = p;
-            while(*p != '"'){
-                p++;
+            for(; *p != '"'; p++){
+                if(*p == '\\'){
+                    p++; // '\'の次にある文字を飛ばす。(一字的な措置。)
+                }
             }
             cur -> len  = p - q;
             p++; // '"'を読み飛ばす
