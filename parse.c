@@ -486,12 +486,14 @@ static Node* new_sub(Node *lhs, Node *rhs){
     }
     /* pointer - pointerは要素数(どちらの型も同じことが期待されている。) */
     if(is_ptr(lhs -> ty) && is_ptr(rhs -> ty)){
-        lhs = new_binary(ND_SUB, lhs, rhs);
-        return new_binary(ND_MUL, lhs, new_num_node(lhs -> ty -> base -> size));
+        Node *node = new_binary(ND_SUB, lhs, rhs);
+        node -> ty = ty_long; 
+        return new_binary(ND_DIV, node, new_num_node(lhs -> ty -> base -> size));
     }
     /* pointer - num は pointer - sizeof(type) * num */
     if(is_ptr(lhs -> ty) && is_integer(rhs -> ty)){
         rhs = new_binary(ND_MUL, new_num_node(lhs -> ty -> base -> size), rhs);
+        add_type(rhs);
     }
     return new_binary(ND_SUB, lhs, rhs);
 }

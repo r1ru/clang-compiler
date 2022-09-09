@@ -1,5 +1,6 @@
 #include "9cc.h"
 
+Type *ty_long = &(Type){TY_LONG, 8};// 現状pointerの引き算の結果の型にしか使っていない。
 Type *ty_int = &(Type){TY_INT, 4};
 Type *ty_char =&(Type){TY_CHAR, 1};
 
@@ -45,7 +46,8 @@ bool is_func(Type *ty){
 }
 
 void add_type(Node *node) {
-    if (!node) //有効な値がない可能性があるため。
+    /* 有効な値でないか、Nodeが既に型付けされている場合は何もしない。上書きを防ぐため。*/
+    if (!node || node -> ty) 
         return;
 
     add_type(node -> rhs);
