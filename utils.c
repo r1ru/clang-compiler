@@ -18,3 +18,8 @@ void vec_push(Vector* vp, void* elem){
     vp -> len ++;
 }
 
+/* 最後の要素を取り出す */
+void *vec_last(Vector *v){
+  assert(v -> len);
+  return v -> data[v -> len - 1];
+}

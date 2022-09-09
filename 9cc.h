@@ -24,6 +24,7 @@ typedef struct{
 
 Vector* new_vec(void);
 void vec_push(Vector* vp, void* elem);
+void *vec_last(Vector *v);
 
 /* tokenize.c */
 typedef struct Token Token;
@@ -99,6 +100,7 @@ struct Obj{
 
 typedef enum{
     ND_EXPR_STMT, // expression statement
+    ND_STMT_EXPR, // [GNU] statement expression
     ND_ADD,
     ND_SUB,
     ND_MUL,
@@ -138,7 +140,7 @@ struct Node{
     char* funcname; // function name
     Vector* args; // argments;
 
-    Vector* body; // for compound statement
+    Vector* body; // ND_BLOCK or ND_STMT_EXPR
     int val; // ND_NUM用
     Obj* var; // ND_VAR用
 };

@@ -6,6 +6,9 @@ static char* argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static char* argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
 static char* argreg8[] = {"dil", "sil", "dl", "cl", "r8b", "r9b" };
 
+static void gen_expr(Node* np);
+static void gen_stmt(Node* np);
+
 static void push(void){
     fprintf(STREAM, "\tpush rax\n");
 }
@@ -109,6 +112,13 @@ static void gen_expr(Node* np){
             gen_expr(np -> rhs);
             load(np -> ty);
             return;
+
+        case ND_STMT_EXPR:
+            for(int i = 0; i < np -> body -> len; i++){
+                gen_stmt(np -> body -> data[i]);
+            }
+            return;
+
     }
 
     /* 左辺と右辺を計算してスタックに保存 */
@@ -211,7 +221,7 @@ static void gen_stmt(Node* np){
             return;
         
         case ND_BLOCK:
-             for(int i = 0; i < np -> body -> len; i++){
+            for(int i = 0; i < np -> body -> len; i++){
                 gen_stmt(np -> body -> data[i]);
             }
             return;

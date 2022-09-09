@@ -95,11 +95,20 @@ void add_type(Node *node) {
                 error("invalid pointer dereference");
             node -> ty = node -> rhs -> ty -> base;
             return;
-        case ND_BLOCK:
-            for(int i = 0; i < node -> body -> len; i++){
-                Node* n = node -> body -> data[i];
-                add_type(n);
-            }   
+
+        /* ND_BLOCK or ND_STMT_EXPR */
+        for(int i = 0; i < node -> body -> len; i++){
+            Node* n = node -> body -> data[i];
+            add_type(n);
+        }   
+        Node *last;
+
+        case ND_STMT_EXPR:
+            last = vec_last(node -> body);
+            if(last -> kind != ND_EXPR_STMT){
+                error("statement expression returning void is not supported"); // TODO: ここを改良
+            }
+            node -> ty = last -> rhs -> ty;
             return;
         }
 }

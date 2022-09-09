@@ -538,15 +538,22 @@ static Node* postfix(void){
             | ident
             | str
             | funcall
-            | "(" expr ")" */
+            | "(" expr ")" 
+            | "(" "{" compound-stmt ")" */
 static Node* primary(void){
     Node* np;
 
-    /* "("ならexprを呼ぶ */
     if(consume("(")){
-        np = expr();
-        expect(")");
-        return np;
+        if(consume("{")){
+            np = new_node(ND_STMT_EXPR);
+            np -> body = compound_stmt() -> body;
+            expect(")");
+            return np; 
+        }else{
+            np = expr();
+            expect(")");
+            return np;
+        }
     }
 
     if(is_ident()){
