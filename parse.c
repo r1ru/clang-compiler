@@ -5,6 +5,41 @@ Token *token;
 static Vector *locals;
 static Vector *globals;
 
+typedef struct VarScope VarScope;
+
+struct VarScope {
+    VarScope *next;
+    char *name;
+    Obj *var;
+};
+
+typedef struct Scope Scope;
+
+struct Scope{
+    Scope *next;
+    VarScope *vars;
+};
+
+static Scope *scope = &(Scope){}; //現在のスコープ
+
+static void enter_scope(void){
+    Scope *sc = calloc(1, sizeof(Scope));
+    sc -> next = scope;
+    scope = sc;
+}
+
+static void leave_scope(void){
+    scope = scope -> next;
+}
+
+static void push_scope(char *name, Obj *var){
+    VarScope *vsc = calloc(1, sizeof(VarScope));
+    vsc -> name = name;
+    vsc -> var = var;
+    vsc -> next = scope -> vars;
+    scope -> vars = vsc;
+}
+
 /* 次のトークンを読む。(tokenを更新するのはこの関数のみ) */
 static void next_token(void){
     token = token -> next;
@@ -67,20 +102,12 @@ static bool at_eof(void){
 }
 
 /* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */
-static Obj *find_var(Token* tp) {
-    int i;
-    for(i = 0; i < locals -> len; i++){
-        Obj *lvar = locals -> data[i];
-        if(strlen(lvar-> name) == tp -> len && !strncmp(lvar -> name, tp -> str, tp -> len)){
-            next_token();
-            return lvar;
-        }
-    }
-    for(i = 0; i < globals -> len; i++){
-        Obj *gvar = globals -> data[i];
-        if(strlen(gvar-> name) == tp -> len && !strncmp(gvar -> name, tp -> str, tp -> len)){
-            next_token();
-            return gvar;
+static Obj *find_var(Token* tok) {
+    for(Scope *sc = scope; sc; sc = sc -> next){
+        for(VarScope *vsc = sc -> vars; vsc; vsc = vsc -> next){
+            if(is_equal(tok, vsc -> name)){
+                return vsc -> var;
+            }
         }
     }
     return NULL;
@@ -91,6 +118,7 @@ static Obj* new_var(char* name, Type* ty){
     Obj* var = calloc(1, sizeof(Obj));
     var -> ty = ty;
     var -> name = name;
+    push_scope(name, var);
     return var;
 }
 
@@ -203,12 +231,14 @@ static void create_param_lvars(Vector* params){
 /* function = "{" compound_stmt */
 static void function(Type *ty){
     locals = new_vec();
-    create_param_lvars(ty -> params);
     Obj* func = new_gvar(get_ident(ty -> name), ty);
+    enter_scope(); //仮引数を関数のスコープに入れるため。
+    create_param_lvars(ty -> params);
     func -> num_params = locals -> len;
     expect("{");
     func -> body = compound_stmt();
     func-> locals = locals;
+    leave_scope();
 }
 
 /* stmt = expr ";" 
@@ -290,6 +320,7 @@ static bool is_typename(void){
 static Node* compound_stmt(void){
     Node *np = new_node(ND_BLOCK);
     np -> body = new_vec();
+    enter_scope();
     while(!consume("}")){
         if(is_typename()){
             declaration();
@@ -300,6 +331,7 @@ static Node* compound_stmt(void){
             vec_push(np -> body, s); 
         }
     }
+    leave_scope();
     return np;
 }
 
@@ -561,6 +593,7 @@ static Node* primary(void){
             return funcall();
         }
         Obj *var = find_var(token);
+        next_token();
         if(!var){
             error_at(token -> str, "undefined variable");
         }
