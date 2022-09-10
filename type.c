@@ -59,6 +59,16 @@ void add_type(Node *node) {
     add_type(node -> init);
     add_type(node -> inc);
 
+    /* ND_BLOCK or ND_STMT_EXPR */
+    for(Node *stmt = node -> body; stmt; stmt = stmt -> next){
+        add_type(stmt);
+    }   
+
+    /* ND_FUNCALL */
+    for(Node *arg = node -> args; arg; arg = arg -> next){
+        add_type(arg);
+    }
+
     switch (node -> kind) {
         case ND_ADD:
         case ND_SUB:
@@ -72,14 +82,8 @@ void add_type(Node *node) {
         case ND_LT:
         case ND_LE:
         case ND_NUM:
-            node -> ty = ty_int;
-            return;
         case ND_FUNCCALL:
-            /* 引数があれば */
-            for(Node *arg = node -> args; arg; arg = arg -> next){
-                add_type(arg);
-            }
-            node -> ty = ty_int;// TODO: ここを直す。
+            node -> ty = ty_int;
             return;
         case ND_VAR:
             node -> ty = node -> var -> ty;
@@ -94,11 +98,6 @@ void add_type(Node *node) {
                 error("invalid pointer dereference");
             node -> ty = node -> rhs -> ty -> base;
             return;
-
-        /* ND_BLOCK or ND_STMT_EXPR */
-        for(Node *stmt = node -> body; stmt; stmt = stmt -> next){
-            add_type(stmt);
-        }   
        
         case ND_STMT_EXPR:
             if(node -> body){

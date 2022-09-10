@@ -168,6 +168,13 @@ static Node* new_binary(NodeKind kind, Node* lhs, Node* rhs){
     return np;
 }
 
+/* 単項演算(unary operator)用 */
+static Node* new_unary(NodeKind kind, Node *rhs){
+    Node* np = new_node(kind);
+    np -> rhs = rhs;
+    return np;
+}
+
 /* ND_NUMを作成 */
 static Node* new_num_node(int val){
     Node* np = new_node(ND_NUM);
@@ -189,11 +196,13 @@ static Type* declarator(Type *ty);
 static void function(Type *ty);
 static Node* stmt(void);
 static Node* compound_stmt(void);
-static void declaration(void); //今はまだ初期化式がないのでvoid
+static Node* declaration(void);
 static Node* expr(void);
 static Node* assign(void);
 static Node* equality(void);
 static Node * relational(void);
+static Node* new_add(Node *lhs, Node *rhs);
+static Node* new_sub(Node *lhs, Node *rhs);
 static Node* add(void);
 static Node* mul(void);
 static Node* unary(void);
@@ -305,8 +314,7 @@ static Node* stmt(void){
     }
 
     /* expr ";" */
-    np = new_node(ND_EXPR_STMT);
-    np -> rhs = expr();
+    np = new_unary(ND_EXPR_STMT, expr());
     expect(";");
     return np;
 }
@@ -323,12 +331,12 @@ static Node* compound_stmt(void){
     enter_scope();
     while(!consume("}")){
         if(is_typename()){
-            declaration();
+            cur = cur -> next = declaration();
         }
         else{
             cur = cur -> next = stmt();
-            add_type(cur);
         }
+        add_type(cur);
     }
     leave_scope();
     node -> body = head.next;
@@ -371,7 +379,12 @@ static Type* type_suffix(Type *ty){
         return func_params(ty);
     }
     if(consume("[")){
-        int size = expect_number();
+        int size;
+        if(is_equal(token, "]")){
+            size = 0; // 要素数が指定されていない場合
+        }else{
+            size = expect_number();
+        }
         expect("]"); 
         return array_of(ty, size);
     }
@@ -392,12 +405,69 @@ static Type* declarator(Type *ty){
     ty -> name = name;
 }
 
-/* declaration = type-specifier declarator ";" TODO: 重複定義を落とす*/
-static void declaration(void){
+/* type-specifier declarator ("=" expr)? ("," declarator ("=" expr)?)* ";" */
+static Node *declaration(void){
     Type* base = type_specifier();
-    Type* ty = declarator(base);
-    new_lvar(get_ident(ty -> name), ty);
-    expect(";");
+    Node head = {};
+    Node *cur = &head;
+    while(!consume(";")){
+        Type* ty = declarator(base);
+        Obj *var = new_lvar(get_ident(ty -> name), ty);
+
+        /* 要素数が指定されていないかつ初期か式がない配列定義はエラー */
+        if(var -> ty -> size == 0 && !is_equal(token, "=")){
+            error_at(var -> ty -> name -> str, "incomplete type is not allowed\n");
+        }
+
+        if(consume("=")){
+            if(var -> ty -> kind == TY_ARRAY){
+                int idx = 0;
+                if(is_str()){
+                    /* char s[] = "abc"; は s[0]='a'; s[1]='b'; s[2]='c';と解釈 */
+                    for(; idx < token -> len; idx++){
+                        Node *lhs =  new_unary(ND_DEREF, new_add(new_var_node(var), new_num_node(idx)));
+                        Node *rhs = new_num_node(token -> str[idx]);
+                        Node *node = new_binary(ND_ASSIGN, lhs, rhs);
+                        cur = cur -> next = new_unary(ND_EXPR_STMT, node);
+                    }
+                    next_token(); // TK_STRを読み飛ばす
+                }else{
+                    expect("{");
+                    do{
+                        Node *lhs = new_unary(ND_DEREF, new_add(new_var_node(var), new_num_node(idx)));
+                        Node *rhs = expr();
+                        Node *node = new_binary(ND_ASSIGN, lhs, rhs);
+                        cur = cur -> next = new_unary(ND_EXPR_STMT, node);
+                        idx++;
+                    }while(consume(","));
+                    expect("}");
+                }
+
+                /* 初期か式の数が要素数よりも少ないときは、残りを0クリアする。*/
+                if(idx < var -> ty -> size / var -> ty -> base -> size){
+                    for(;idx != var -> ty -> size / var -> ty -> base -> size; idx++){
+                        Node *lhs = new_unary(ND_DEREF, new_add(new_var_node(var), new_num_node(idx)));
+                        Node *rhs = new_num_node(0);
+                        Node *node = new_binary(ND_ASSIGN, lhs, rhs);
+                        cur = cur -> next = new_unary(ND_EXPR_STMT, node);
+                    }
+                }
+                /* 要素数が指定されていない場合サイズを修正する。*/
+                if(var -> ty -> size == 0){
+                    var -> ty -> size = var -> ty -> base -> size * idx;
+                }
+            }else{
+                Node *node = new_binary(ND_ASSIGN, new_var_node(var), expr()); 
+                cur = cur -> next = new_unary(ND_EXPR_STMT, node);
+            }
+        }
+        if(consume(",")){
+            continue;
+        }
+    }
+    Node *node = new_node(ND_BLOCK);
+    node -> body = head.next;
+    return node;
 }
 
 /* expr = assign */
@@ -451,12 +521,6 @@ static Node* relational(void){
         }
         return np;
     }
-}
-
-static Node* new_unary(NodeKind kind, Node *rhs){
-    Node* np = new_node(kind);
-    np -> rhs = rhs;
-    return np;
 }
 
 static Node* new_add(Node *lhs, Node *rhs){
@@ -597,10 +661,10 @@ static Node* primary(void){
             return funcall();
         }
         Obj *var = find_var(token);
-        next_token();
         if(!var){
             error_at(token -> str, "undefined variable");
         }
+        next_token();
         return new_var_node(var);
     }
 
