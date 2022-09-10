@@ -72,12 +72,9 @@ static void type_info(Type *ty){
         case TY_FUNC:
             type_info(ty -> ret_ty);
             fprintf(debug, " ( ");
-            if(ty -> params){
-                for(i = 0; i < ty -> params -> len; i++){
-                    t = ty -> params -> data[i];
-                    type_info(t);
-                    fprintf(debug, " ");
-                }
+            for(Type *var = ty -> params; var; var = var -> next){
+                type_info(var);
+                fprintf(debug, " ");
             }
             fprintf(debug, ")");
             return;
@@ -99,23 +96,21 @@ static void display_obj(Obj *obj, bool is_global){
 static void display_func(Obj *func){
     type_info(func -> ty);
     fprintf(debug, " %s:\n", func -> name);
-    fprintf(debug, "\t[%d local variables, %d bytes stack]\n", func -> locals -> len, func -> stack_size);
-    for(int i =0; i < func -> locals -> len; i++){
-        Obj *lvar = func -> locals -> data[i];
+    fprintf(debug, "\t[%d bytes stack]\n", func -> stack_size);
+    for(Obj *lvar = func -> locals; lvar; lvar = lvar -> next){
         fprintf(debug, "\t");
         display_obj(lvar, false);
     }
 }
 
-void display_globals(Vector *globals){
+void display_globals(Obj *globals){
     fprintf(debug, "----[Globals]----\n");
-    for(int i = 0; i < globals -> len; i++){
-        Obj *global = globals -> data[i];
+    for(Obj *global = globals; global; global = global -> next){
         if(is_func(global -> ty)){
             display_func(global);
             continue;;
         }
-        display_obj(global, true);
+        display_obj(global, true); 
     }
 }
 

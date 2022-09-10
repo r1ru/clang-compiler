@@ -51,7 +51,7 @@ int main(int argc, char* argv[]){
     tokenize(argv[1], buf);
 
     /* 構文解析 */
-    Vector *program = parse();
+    Obj *program = parse();
 
     codegen(program);
 

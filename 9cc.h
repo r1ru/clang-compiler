@@ -15,17 +15,6 @@
 
 typedef struct Node Node;
 
-/* utils.c */
-typedef struct{
-    void** data; // 汎用
-    int capacity;
-    int len;
-}Vector;
-
-Vector* new_vec(void);
-void vec_push(Vector* vp, void* elem);
-void *vec_last(Vector *v);
-
 /* tokenize.c */
 typedef struct Token Token;
 
@@ -65,8 +54,11 @@ struct Type{
     int size;
     Token *name;
     Type *base;
+
+    /* function type */
     Type *ret_ty;
-    Vector *params;
+    Type *next;
+    Type *params;
 };
 
 extern Type *ty_long;
@@ -86,6 +78,7 @@ void add_type(Node* np);
 typedef struct Obj Obj;
 
 struct Obj{
+    Obj *next;
     Type *ty; // 型情報
     char *name; // 変数の名前
     int offset; // RBPからのオフセット
@@ -94,8 +87,8 @@ struct Obj{
     bool is_global;
 
     //function
-    int num_params;
-    Vector *locals;
+    Obj *params;
+    Obj *locals;
     Node *body;
     int stack_size;
 };
@@ -140,24 +133,24 @@ struct Node{
     Node* inc; 
 
     char* funcname; // function name
-    Vector* args; // argments;
+    Node* args; // argments;
 
-    Vector* body; // ND_BLOCK or ND_STMT_EXPR
+    Node* body; // ND_BLOCK or ND_STMT_EXPR
     int val; // ND_NUM用
     Obj* var; // ND_VAR用
 };
 
 extern Token *token;
 
-Vector * parse(void);
+Obj* parse(void);
 
 /* codegen.c */
-void codegen(Vector *program);
+void codegen(Obj *program);
 
 /* debug.c */
 extern FILE* debug;
 
 void check_tokenizer_output(Token* head);
-void display_globals(Vector *globals);
+void display_globals(Obj *globals);
 
 #endif

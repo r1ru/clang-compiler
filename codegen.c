@@ -1,6 +1,6 @@
 #include "9cc.h"
 
-static Obj *func; // 現在コードを生成している関数
+static Obj *current_fn; // 現在コードを生成している関数
 static unsigned int llabel_index; // ローカルラベル用のインデックス
 static char* argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static char* argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
@@ -87,22 +87,22 @@ static void gen_expr(Node* np){
             store(np -> ty);
             return;
 
-        case ND_FUNCCALL:
-            /* 引数があれば */
-            if(np -> args){
-                int i;
-                for(i= np -> args -> len - 1; 0 <= i; i--){
-                    gen_expr(np -> args -> data[i]); // 引数を逆順にスタックに積む。こうすると6つ以上の引数をとる関数呼び出を実現するのが簡単になる。
-                    push();
-                }
-                // x86-64では先頭から6つの引数までをレジスタで渡す。TODO: 16btyeアラインメントする
-                for(i = 0; i < np -> args -> len && i < 6; i++){
-                    pop(argreg64[i]); // レジスタにストア(前から順番に。)
-                }
+        case ND_FUNCCALL:{
+            /* parser側でひと工夫しているので先頭からpushするだけで逆順になる。*/
+            int nargs = 0;
+            for(Node *arg = np -> args; arg; arg = arg -> next){
+                gen_expr(arg);
+                nargs++;
+                push();
+            }
+            /* x86-64では先頭から6つの引数までをレジスタで渡す。 */
+            for(int i=0; i < nargs && i < 6; i++){
+                pop(argreg64[i]);
             }
             fprintf(STREAM, "\tmov rax, 0\n"); // 浮動小数点の引数の個数
             fprintf(STREAM, "\tcall %s\n", np -> funcname);
             return;
+        }
         
         case ND_ADDR:
             gen_addr(np -> rhs);
@@ -114,8 +114,8 @@ static void gen_expr(Node* np){
             return;
 
         case ND_STMT_EXPR:
-            for(int i = 0; i < np -> body -> len; i++){
-                gen_stmt(np -> body -> data[i]);
+            for(Node *stmt = np -> body; stmt; stmt = stmt -> next){
+                gen_stmt(stmt);
             }
             return;
 
@@ -172,7 +172,7 @@ static void gen_stmt(Node* np){
     
         case ND_RET:
             gen_expr(np -> rhs);
-            fprintf(STREAM, "\tjmp .L.end.%s\n", func -> name);
+            fprintf(STREAM, "\tjmp .L.end.%s\n", current_fn -> name);
             return;
 
         case ND_IF:
@@ -221,8 +221,8 @@ static void gen_stmt(Node* np){
             return;
         
         case ND_BLOCK:
-            for(int i = 0; i < np -> body -> len; i++){
-                gen_stmt(np -> body -> data[i]);
+            for(Node *stmt = np -> body; stmt; stmt = stmt -> next){
+                gen_stmt(stmt);
             }
             return;
 
@@ -248,27 +248,24 @@ static int align_to(int offset, int align){
     return (offset + align - 1) / align * align;
 }
 
-static void assign_lvar_offsets(Vector *globals){
-    for(int i =0; i < globals -> len; i++){
-        Obj *func = globals -> data[i];
-        if(!is_func(func -> ty)){
+static void assign_lvar_offsets(Obj *globals){
+    for(Obj *fn = globals; fn; fn = fn -> next){
+        if(!is_func(fn -> ty)){
             continue;
         }
 
         int offset = 0;
-        for(int j = 0; j < func -> locals -> len; j++){
-            Obj* lvar = func -> locals -> data[j];
+        for(Obj *lvar = fn -> locals; lvar; lvar = lvar ->next){
             offset += lvar -> ty -> size;
             lvar -> offset = offset;
         }
-        func -> stack_size = align_to(offset, 16);
+        fn -> stack_size = align_to(offset, 16);
     }
 }
 
-static void emit_data(Vector *globals){
+static void emit_data(Obj *globals){
     fprintf(STREAM, ".data\n");
-    for(int i = 0; i < globals -> len; i++){
-        Obj *gvar = globals -> data[i];
+    for(Obj *gvar = globals; gvar; gvar = gvar -> next){
         if(is_func(gvar -> ty)){
             continue;
         }
@@ -283,42 +280,42 @@ static void emit_data(Vector *globals){
     }
 }
 
-static void emit_text(Vector *globals){
+static void emit_text(Obj *globals){
     fprintf(STREAM, ".text\n");
-    for(int i = 0; i < globals -> len; i++){
-        func = globals -> data[i];
-        if(!is_func(func -> ty)){
+    for(Obj *fn = globals; fn; fn = fn -> next){
+        if(!is_func(fn -> ty)){
             continue;
         }
+        current_fn = fn;
         /* アセンブリの前半を出力 */
-        fprintf(STREAM, ".global %s\n", func -> name);
-        fprintf(STREAM, "%s:\n", func -> name);
+        fprintf(STREAM, ".global %s\n", fn -> name);
+        fprintf(STREAM, "%s:\n", fn -> name);
 
         /* プロローグ。 */
         fprintf(STREAM, "\tpush rbp\n");
         fprintf(STREAM, "\tmov rbp, rsp\n");
-        if(func -> stack_size != 0){
-            fprintf(STREAM, "\tsub rsp, %u\n", func -> stack_size);
+        if(fn -> stack_size != 0){
+            fprintf(STREAM, "\tsub rsp, %u\n", fn -> stack_size);
         }
 
+        int i = 0;
         /* パラメータをスタック領域にコピー */
-        for(int j = 0; j < func -> num_params && j < 6; j++){
-            Obj* lvar = func -> locals -> data[j];
-            store_arg(j, lvar -> offset, lvar -> ty -> size);
+        for(Obj *var = fn -> params; var; var = var -> next){
+            store_arg(i, var -> offset, var -> ty -> size);
+            i++;
         }
-
         /* コード生成 */
-        gen_stmt(func -> body);
+        gen_stmt(fn -> body);
 
         /* エピローグ */
-        fprintf(STREAM, ".L.end.%s:\n", func -> name); // このラベルは関数ごと。
+        fprintf(STREAM, ".L.end.%s:\n", fn -> name); // このラベルは関数ごと。
         fprintf(STREAM, "\tmov rsp, rbp\n");
         fprintf(STREAM, "\tpop rbp\n");
         fprintf(STREAM, "\tret\n"); /* 最後の式の評価結果が返り値になる。*/   
     }
 }
 
-void codegen(Vector *globals){
+void codegen(Obj *globals){
     fprintf(STREAM, ".intel_syntax noprefix\n");
     assign_lvar_offsets(globals);
     display_globals(globals);

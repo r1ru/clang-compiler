@@ -2,8 +2,8 @@
 
 Token *token;
 
-static Vector *locals;
-static Vector *globals;
+static Obj *locals;
+static Obj *globals;
 
 typedef struct VarScope VarScope;
 
@@ -122,17 +122,19 @@ static Obj* new_var(char* name, Type* ty){
     return var;
 }
 
-/* 新しい変数を作成して引数で指定されたVectorに格納。 TODO: 重複定義を落とす*/
+/* 新しい変数を作成してリストに登録。 TODO: 重複定義を落とす*/
 static Obj *new_lvar(char* name, Type *ty){
     Obj *lvar = new_var(name, ty);
-    vec_push(locals, lvar);
+    lvar -> next = locals;
+    locals = lvar;
     return lvar;
 }
 
 static Obj *new_gvar(char *name, Type *ty) {
     Obj *gvar = new_var(name, ty);
     gvar -> is_global = true;
-    vec_push(globals, gvar);
+    gvar -> next = globals;
+    globals = gvar;
     return gvar;
 }
 
@@ -201,8 +203,8 @@ static Node* funcall(void);
 
 /* program  = type-specifier declarator ";"
             | type-specifier declarator body */
-Vector * parse(void){
-    globals = new_vec();
+Obj * parse(void){
+    globals = NULL;
     while(!at_eof()){
         Type *base = type_specifier();
         Type *ty = declarator(base);
@@ -217,24 +219,21 @@ Vector * parse(void){
     return globals;
 }
 
-static void create_param_lvars(Vector* params){
-    /* 引数が無ければ返る。*/
-    if(!params){
-        return;
-    }
-    for(int i = 0; i < params -> len; i++){
-        Type *param = params -> data[i];
+/* ty->paramsは arg1->arg2->arg3 ...のようになっている。これを素直に前からnew_lvarを読んでいくと、localsは arg3->arg2->arg1という風になる。関数の先頭では渡されたパラメータを退避する必要があり、そのためにはlocalsをarg1->arg2->arg3のようにしたい。そこでty->paramsの最後の要素から生成している。*/
+static void create_param_lvars(Type* param){
+    if(param){
+        create_param_lvars(param -> next);
         new_lvar(get_ident(param -> name), param);
     }
 }
 
 /* function = "{" compound_stmt */
 static void function(Type *ty){
-    locals = new_vec();
+    locals = NULL;
     Obj* func = new_gvar(get_ident(ty -> name), ty);
     enter_scope(); //仮引数を関数のスコープに入れるため。
     create_param_lvars(ty -> params);
-    func -> num_params = locals -> len;
+    func -> params = locals;
     expect("{");
     func -> body = compound_stmt();
     func-> locals = locals;
@@ -318,21 +317,22 @@ static bool is_typename(void){
 
 /* compound-stmt = (declaration | stmt)* "}" */
 static Node* compound_stmt(void){
-    Node *np = new_node(ND_BLOCK);
-    np -> body = new_vec();
+    Node *node = new_node(ND_BLOCK);
+    Node head = {};
+    Node *cur = &head;
     enter_scope();
     while(!consume("}")){
         if(is_typename()){
             declaration();
         }
         else{
-            Node *s = stmt();
-            add_type(s); // 型チェック
-            vec_push(np -> body, s); 
+            cur = cur -> next = stmt();
+            add_type(cur);
         }
     }
     leave_scope();
-    return np;
+    node -> body = head.next;
+    return node;
 }
 
 static Type* type_specifier(void){
@@ -348,15 +348,17 @@ static Type* type_specifier(void){
 /* func-params = (param ("," param)*)? ")"
  param       = type-specifier declarator */
 static Type* func_params(Type *ret_ty){
+    Type head = {};
+    Type *cur = &head;
     Type *func = func_type(ret_ty);
     if(!is_equal(token, ")")){
-        func -> params = new_vec();
         do{
             Type *base = type_specifier();
             Type *ty = declarator(base);
-            vec_push(func -> params, copy_type(ty)); // copyしないと上書きされる可能性があるから。
+            cur = cur -> next = copy_type(ty); // copyしないと上書きされる可能性があるから。
         }while(consume(","));   
     }
+    func -> params = head.next;
     expect(")");
     return func;
 }
@@ -617,14 +619,18 @@ static Node* funcall(void){
     Node* np = new_node(ND_FUNCCALL);
     np -> funcname = get_ident(token);
     next_token();
-    
+
     expect("(");
-    /* 引数がある場合 */
+
+    /* 例えばf(1,2,3)の場合、リストは3->2->1のようにする。これはコード生成を簡単にするため。 */
     if(!is_equal(token, ")")){
-        np -> args = new_vec();
-        do{
-            vec_push(np->args, expr());
-        }while(consume(","));
+        Node *cur = expr();
+        while(consume(",")){
+            Node *param = expr();
+            param -> next = cur;
+            cur = param;
+        }
+        np -> args = cur;
     }
     expect(")");
     return np;   

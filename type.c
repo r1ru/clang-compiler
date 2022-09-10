@@ -59,7 +59,7 @@ void add_type(Node *node) {
     add_type(node -> init);
     add_type(node -> inc);
 
-    switch (node->kind) {
+    switch (node -> kind) {
         case ND_ADD:
         case ND_SUB:
         case ND_MUL:
@@ -76,11 +76,8 @@ void add_type(Node *node) {
             return;
         case ND_FUNCCALL:
             /* 引数があれば */
-            if(node -> args){
-                for(int i = 0; i < node -> args -> len; i++){
-                    Node* n = node -> args -> data[i];
-                    add_type(n);
-                }   
+            for(Node *arg = node -> args; arg; arg = arg -> next){
+                add_type(arg);
             }
             node -> ty = ty_int;// TODO: ここを直す。
             return;
@@ -99,18 +96,21 @@ void add_type(Node *node) {
             return;
 
         /* ND_BLOCK or ND_STMT_EXPR */
-        for(int i = 0; i < node -> body -> len; i++){
-            Node* n = node -> body -> data[i];
-            add_type(n);
+        for(Node *stmt = node -> body; stmt; stmt = stmt -> next){
+            add_type(stmt);
         }   
-        Node *last;
-
+       
         case ND_STMT_EXPR:
-            last = vec_last(node -> body);
-            if(last -> kind != ND_EXPR_STMT){
-                error("statement expression returning void is not supported"); // TODO: ここを改良
+            if(node -> body){
+                Node *stmt = node -> body;
+                while(stmt -> next){
+                    stmt = stmt -> next;
+                }
+                if(stmt -> kind != ND_EXPR_STMT){
+                    error("statement expression returning void is not supported"); // TODO: ここを改良
+                }
+                node -> ty = stmt -> rhs -> ty;
+                return;
             }
-            node -> ty = last -> rhs -> ty;
-            return;
         }
 }
