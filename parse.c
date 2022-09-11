@@ -210,6 +210,116 @@ static Node* postfix(void);
 static Node* primary(void);
 static Node* funcall(void);
 
+
+static Initializer* new_initializer(void){
+    Initializer *init = calloc(1, sizeof(Initializer));
+    return init;
+}
+
+static int eval(Node *node, char **label){
+    switch(node -> kind){
+        case ND_ADD:
+            return eval(node -> lhs, label) + eval(node -> rhs, label);
+        case ND_SUB:
+            return eval(node -> lhs, label) - eval(node -> rhs, label);
+        case ND_MUL:
+            return eval(node -> lhs, label) * eval(node -> rhs, label);
+        case ND_DIV:
+            return eval(node -> lhs, label) + eval(node -> rhs, label);
+        case ND_NUM:
+            return node -> val;
+        case ND_ADDR:
+            if(!node -> rhs -> var -> is_global){
+                error("not a compile-time constant");
+            }
+            *label = node -> rhs -> var -> name;
+            return 0;
+        case ND_VAR:
+            if(node -> ty -> kind != TY_ARRAY){
+                error("not a compile-time constant");
+            }
+            *label = node -> var -> name;
+            return 0;
+    }
+    error("initializer element is not constant");
+}
+
+static void gen_init(Obj *gvar){
+    char * buf = calloc(1, 30);
+    int size = gvar -> ty -> kind == TY_ARRAY ? gvar -> ty -> base -> size : gvar -> ty -> size;
+    for(Initializer *init = gvar -> initializer; init; init = init -> next){
+        if(init -> data){
+            continue; // 文字列リテラルの場合(配列)
+        }
+        char *label = NULL;
+        int val = eval(init -> expr, &label);
+        /* ND_NUM (+ | -) ND_NUM */
+        if(!label){
+            if(size == 8){
+                sprintf(buf, "\t.quad %d\n", val);
+            }else if(size == 4){
+                sprintf(buf, "\t.long %d\n", val);
+            }else{
+                sprintf(buf, "\t.byte %d\n", val);
+            }
+            init -> data = buf;
+            continue;
+        }else{
+            /* ND_PTR (+ | -) ND_NUM */
+            if(size == 8){
+                sprintf(buf, "\t.quad %s+%d\n", label, val);
+            }else if(size == 4){
+                sprintf(buf, "\t.long %s+%d\n", label, val);
+            }else{
+                sprintf(buf, "\t.byte %s+%d\n", label, val);
+            }
+            init -> data = buf;
+            continue;
+        }
+        assert(0); // unreachable
+    }
+}
+
+static void global_initializer(Obj *gvar){
+    if(gvar -> ty -> kind == TY_ARRAY){
+        if(is_str()){
+            char *str = strndup(token -> str, token -> len);
+            if(gvar -> ty -> size == 0){
+                gvar -> init_data = str; // .stringで確保するため。
+            }else{
+                Initializer *init = new_initializer();
+                init -> data = strndup(token -> str, token -> len);
+                init -> is_string = true;
+                gvar -> initializer = init;
+            }
+            next_token();
+        }else{
+            int idx = 0;
+            expect("{");
+            Initializer head = {};
+            Initializer * cur = &head;
+            do{
+                cur = cur -> next = new_initializer();
+                cur -> expr = expr();
+                add_type(cur -> expr);
+                idx++;
+            }while(consume(","));
+            expect("}");
+            gvar -> initializer = head.next;
+            /* 要素数が指定されていない場合サイズを修正する。*/
+            if(gvar -> ty -> size == 0){
+                gvar -> ty -> size = gvar -> ty -> base -> size * idx;
+            }
+        }
+    }else{
+        Initializer *init = new_initializer();
+        init -> expr = expr();
+        add_type(init -> expr);
+        gvar -> initializer = init;
+    }
+    gen_init(gvar);
+}
+
 /* program  = type-specifier declarator ";"
             | type-specifier declarator body */
 Obj * parse(void){
@@ -221,7 +331,10 @@ Obj * parse(void){
             function(ty);
         }
         else{
-            new_gvar(get_ident(ty -> name), ty);
+            Obj *gvar = new_gvar(get_ident(ty -> name), ty);
+            if(consume("=")){
+                global_initializer(gvar);
+            }
             expect(";");
         }
     }

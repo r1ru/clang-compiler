@@ -266,16 +266,40 @@ static void assign_lvar_offsets(Obj *globals){
 static void emit_data(Obj *globals){
     fprintf(STREAM, ".data\n");
     for(Obj *gvar = globals; gvar; gvar = gvar -> next){
+        int size = gvar -> ty -> size;
         if(is_func(gvar -> ty)){
             continue;
         }
         fprintf(STREAM, ".global %s\n", gvar -> name);
         fprintf(STREAM, "%s:\n", gvar -> name); 
+        /* string literal */
         if(gvar -> init_data){
             fprintf(STREAM, "\t.string \"%s\"\n", gvar -> init_data);
+        }else if(gvar -> ty -> kind == TY_ARRAY){
+            for(Initializer *init = gvar -> initializer; init; init = init -> next){
+                if(init -> is_string){
+                    fprintf(STREAM, "\t.ascii \"%.*s\"\n", gvar -> ty -> size, init -> data);
+                    if(gvar -> ty -> size < strlen(init -> data)){
+                        size = 0;
+                    }else{
+                         size -= strlen(init -> data);
+                    }
+                }else{
+                    fprintf(STREAM, "%s", init -> data);
+                    size -= gvar -> ty -> base -> size;
+                }
+            }
+            if(size != 0){
+                /* 残りを0埋め(.zero 0 がうまくいくならif文必要ないな。) */
+                fprintf(STREAM, "\t.zero %d\n", size);
+            }
         }
         else{
-            fprintf(STREAM, "\t.zero %d\n", gvar -> ty -> size);
+            if(gvar -> initializer){
+                fprintf(STREAM, "%s", gvar -> initializer -> data);
+            }else{
+                fprintf(STREAM, "\t.zero %d\n", size);
+            }
         }
     }
 }
@@ -318,7 +342,7 @@ static void emit_text(Obj *globals){
 void codegen(Obj *globals){
     fprintf(STREAM, ".intel_syntax noprefix\n");
     assign_lvar_offsets(globals);
-    display_globals(globals);
+    //display_globals(globals);
     emit_data(globals);
     emit_text(globals);
 }

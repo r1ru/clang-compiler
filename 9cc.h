@@ -75,6 +75,14 @@ bool is_func(Type *ty);
 void add_type(Node* np);
 
 /* parse.c */
+typedef struct Initializer Initializer;
+struct Initializer{
+    Initializer *next;
+    Node *expr;
+    char *data;
+    bool is_string; //初期化式の右辺が文字列かどうか
+};
+
 typedef struct Obj Obj;
 
 struct Obj{
@@ -83,7 +91,8 @@ struct Obj{
     char *name; // 変数の名前
     int offset; // RBPからのオフセット
 
-    char *init_data; // string literal
+    char *init_data; // stirng literal
+    Initializer *initializer;
     bool is_global;
 
     //function
