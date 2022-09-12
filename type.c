@@ -12,11 +12,12 @@ Type* pointer_to(Type *base){
     return ty;
 }
 
-Type* array_of(Type *base, int len){
+Type* array_of(Type *base, int array_len){
     Type * ty = calloc(1, sizeof(Type));
     ty -> kind = TY_ARRAY;
     ty -> base = base;
-    ty -> size = base -> size * len;
+    ty -> array_len = array_len;
+    ty -> size = base -> size * array_len;
     return ty;
 }
 

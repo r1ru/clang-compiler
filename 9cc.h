@@ -55,6 +55,9 @@ struct Type{
     Token *name;
     Type *base;
 
+    /* array */
+    int array_len;
+    
     /* function type */
     Type *ret_ty;
     Type *next;

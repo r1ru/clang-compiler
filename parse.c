@@ -492,14 +492,14 @@ static Type* type_suffix(Type *ty){
         return func_params(ty);
     }
     if(consume("[")){
-        int size;
+        int array_len;
         if(is_equal(token, "]")){
-            size = 0; // 要素数が指定されていない場合
+            array_len = 0; // 要素数が指定されていない場合
         }else{
-            size = expect_number();
+            array_len = expect_number();
         }
         expect("]"); 
-        return array_of(ty, size);
+        return array_of(ty, array_len);
     }
     return ty;
 }
@@ -557,8 +557,8 @@ static Node *declaration(void){
                 }
 
                 /* 初期か式の数が要素数よりも少ないときは、残りを0クリアする。*/
-                if(idx < var -> ty -> size / var -> ty -> base -> size){
-                    for(;idx != var -> ty -> size / var -> ty -> base -> size; idx++){
+                if(idx < var -> ty -> array_len){
+                    for(;idx != var -> ty -> array_len; idx++){
                         Node *lhs = new_unary(ND_DEREF, new_add(new_var_node(var), new_num_node(idx)));
                         Node *rhs = new_num_node(0);
                         Node *node = new_binary(ND_ASSIGN, lhs, rhs);
