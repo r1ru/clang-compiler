@@ -324,8 +324,15 @@ Obj * parse(void){
         }
         else{
             Obj *gvar = new_gvar(get_ident(ty -> name), ty);
-            if(consume("=")){
-                gvar_initializer(gvar);
+            while(!is_equal(token, ";")){
+                if(consume("=")){
+                    gvar_initializer(gvar);
+                }
+                if(!consume(",")){
+                    break;
+                }
+                ty = declarator(base);
+                gvar = new_gvar(get_ident(ty -> name), ty);
             }
             expect(";");
         }

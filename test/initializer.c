@@ -7,6 +7,9 @@ char g3[3] = "abc";
 char g4[3] = "ab";
 char g5[] = "abc";
 
+int g6, g7 = 1;
+int g8 = 1, g9[3] = {1,2}; 
+
 int main() {
     ASSERT(1, ({ int x[3]={1,2,3}; x[0]; }));
     ASSERT(2, ({ int x[3]={1,2,3}; x[1]; }));
@@ -30,7 +33,8 @@ int main() {
     ASSERT(97, ({g5[0];}));
     ASSERT(98, ({g5[1];}));
     ASSERT(99, ({g5[2];}));
-
+    ASSERT(1, ({g6 + g7;}));
+    ASSERT(1, ({g8 + g9[2];}));
     printf("OK\n");
   return 0;
 }
