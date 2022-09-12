@@ -273,9 +273,13 @@ static void gvar_initializer(Obj *gvar){
     Node *cur = &head;
     if(is_array(gvar -> ty)){
         if(is_str()){
-            gvar -> str = strndup(token -> str, token -> len);
             if(gvar -> ty -> array_len == 0){
-                gvar -> ty -> size = gvar -> ty -> array_len = strlen(gvar -> str) + 1; // NULL文字分+1
+                gvar -> ty -> array_len = gvar -> ty -> size = token -> len + 1; // NULL文字分+1
+            }
+            if(gvar -> ty -> array_len < token -> len){
+                gvar -> str = strndup(token -> str, gvar -> ty -> array_len);
+            }else{
+                gvar -> str = strndup(token -> str, token -> len);
             }
             next_token();
             return;
