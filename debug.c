@@ -66,7 +66,7 @@ static void type_info(Type *ty){
             return;
 
         case TY_ARRAY:
-            fprintf(debug, "%s[%d]", base_type(ty -> base), ty -> size / ty -> base -> size);
+            fprintf(debug, "%s[%d]", base_type(ty -> base), ty -> array_len);
             return;
 
         case TY_FUNC:
@@ -84,11 +84,35 @@ static void type_info(Type *ty){
 static void display_obj(Obj *obj, bool is_global){
     type_info(obj -> ty);
     fprintf(debug, " %s", obj -> name);
-    if(obj -> init_data){
-        fprintf(debug, " init_data: \"%s\"", obj -> init_data);
+    if(obj -> str){
+        fprintf(debug, " \"%s\"", obj -> str);
     }
     if(!is_global){
         fprintf(debug, " offset: %d", obj -> offset);
+    }else{
+        if(obj -> init_data){
+            fprintf(debug, "\n");
+            int base_size = is_array(obj -> ty) ? obj -> ty -> base -> size : obj -> ty -> size;
+           for(InitData *data = obj -> init_data; data; data = data -> next){
+                if(!data -> label){
+                    if(base_size == 8){
+                        fprintf(debug, ".quad %d\n", data -> val);
+                    }else if(base_size == 4){
+                        fprintf(debug, ".long %d\n", data -> val);
+                    }else{
+                        fprintf(debug, ".byte %d\n", data -> val);
+                    }
+                }else{
+                    if(base_size == 8){
+                        fprintf(debug, ".quad %s+%d\n", data -> label, data -> val);
+                    }else if(base_size == 4){
+                        fprintf(debug, ".long %s+%d\n", data -> label, data -> val);
+                    }else{
+                        fprintf(debug, ".byte %s+%d\n", data -> label, data -> val);
+                    }
+                }
+            }
+        }
     }
     fprintf(debug, "\n");
 }

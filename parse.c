@@ -148,9 +148,9 @@ static char* new_unique_name(void){
 
 static Obj *new_string_literal(Token *tok){
     Type *ty = array_of(ty_char, tok -> len + 1); // null文字があるので+1
-    Obj *str = new_gvar(new_unique_name(), ty);
-    str -> init_data = strndup(tok -> str, tok -> len);
-    return str;
+    Obj *strl = new_gvar(new_unique_name(), ty);
+    strl -> str = strndup(tok -> str, tok -> len);
+    return strl;
 }
 
 /* 新しいnodeを作成 */
@@ -210,13 +210,8 @@ static Node* postfix(void);
 static Node* primary(void);
 static Node* funcall(void);
 
-
-static Initializer* new_initializer(void){
-    Initializer *init = calloc(1, sizeof(Initializer));
-    return init;
-}
-
 static int eval(Node *node, char **label){
+    add_type(node);
     switch(node -> kind){
         case ND_ADD:
             return eval(node -> lhs, label) + eval(node -> rhs, label);
@@ -244,80 +239,73 @@ static int eval(Node *node, char **label){
     error("initializer element is not constant");
 }
 
-static void gen_init(Obj *gvar){
-    char * buf = calloc(1, 30);
-    int size = gvar -> ty -> kind == TY_ARRAY ? gvar -> ty -> base -> size : gvar -> ty -> size;
-    for(Initializer *init = gvar -> initializer; init; init = init -> next){
-        if(init -> data){
-            continue; // 文字列リテラルの場合(配列)
+static InitData* new_init_data(void){
+    InitData *data = calloc(1, sizeof(InitData));
+    return data;
+}
+
+static void gen_gvar_init(Obj *gvar, Node *init){
+    /* 初期化式の評価結果の単方向リスト */
+    InitData head = {};
+    InitData *cur = &head;
+    char *label = NULL;
+    int val;
+    for(Node *expr = init; expr; expr = expr -> next){
+        cur = cur -> next = new_init_data();
+        val = eval(expr, &label);
+        if(label){
+            cur -> label = label;
         }
-        char *label = NULL;
-        int val = eval(init -> expr, &label);
-        /* ND_NUM (+ | -) ND_NUM */
-        if(!label){
-            if(size == 8){
-                sprintf(buf, "\t.quad %d\n", val);
-            }else if(size == 4){
-                sprintf(buf, "\t.long %d\n", val);
-            }else{
-                sprintf(buf, "\t.byte %d\n", val);
-            }
-            init -> data = buf;
-            continue;
-        }else{
-            /* ND_PTR (+ | -) ND_NUM */
-            if(size == 8){
-                sprintf(buf, "\t.quad %s+%d\n", label, val);
-            }else if(size == 4){
-                sprintf(buf, "\t.long %s+%d\n", label, val);
-            }else{
-                sprintf(buf, "\t.byte %s+%d\n", label, val);
-            }
-            init -> data = buf;
-            continue;
-        }
-        assert(0); // unreachable
+        cur -> val = val;
+    }
+    gvar -> init_data = head.next;
+}
+
+static void skip_excess_elements(void){
+    while(!is_equal(token, "}")){
+        next_token();
     }
 }
 
-static void global_initializer(Obj *gvar){
-    if(gvar -> ty -> kind == TY_ARRAY){
+static void gvar_initializer(Obj *gvar){
+    /* 初期式の単方向リスト */
+    Node head = {};
+    Node *cur = &head;
+    if(is_array(gvar -> ty)){
         if(is_str()){
-            char *str = strndup(token -> str, token -> len);
-            if(gvar -> ty -> size == 0){
-                gvar -> init_data = str; // .stringで確保するため。
-            }else{
-                Initializer *init = new_initializer();
-                init -> data = strndup(token -> str, token -> len);
-                init -> is_string = true;
-                gvar -> initializer = init;
+            gvar -> str = strndup(token -> str, token -> len);
+            if(gvar -> ty -> array_len == 0){
+                gvar -> ty -> size = gvar -> ty -> array_len = strlen(gvar -> str) + 1; // NULL文字分+1
             }
             next_token();
-        }else{
+            return;
+        }
+        if(consume("{")){
             int idx = 0;
-            expect("{");
-            Initializer head = {};
-            Initializer * cur = &head;
-            do{
-                cur = cur -> next = new_initializer();
-                cur -> expr = expr();
-                add_type(cur -> expr);
+            while(!consume("}")){
+                cur = cur -> next = expr();
                 idx++;
-            }while(consume(","));
-            expect("}");
-            gvar -> initializer = head.next;
+
+                if(is_equal(token, ",")){
+                    next_token();
+                }
+                if(gvar -> ty -> array_len == idx){
+                    skip_excess_elements();
+                }
+            }
             /* 要素数が指定されていない場合サイズを修正する。*/
-            if(gvar -> ty -> size == 0){
+            if(gvar -> ty -> array_len == 0){
+                gvar -> ty -> array_len = idx;
                 gvar -> ty -> size = gvar -> ty -> base -> size * idx;
             }
         }
+        else{
+            error("invalid initializer"); // 配列の初期化式が不正
+        }
     }else{
-        Initializer *init = new_initializer();
-        init -> expr = expr();
-        add_type(init -> expr);
-        gvar -> initializer = init;
+        cur = cur -> next = expr();
     }
-    gen_init(gvar);
+    gen_gvar_init(gvar, head.next);
 }
 
 /* program  = type-specifier declarator ";"
@@ -333,7 +321,7 @@ Obj * parse(void){
         else{
             Obj *gvar = new_gvar(get_ident(ty -> name), ty);
             if(consume("=")){
-                global_initializer(gvar);
+                gvar_initializer(gvar);
             }
             expect(";");
         }
@@ -518,6 +506,75 @@ static Type* declarator(Type *ty){
     ty -> name = name;
 }
 
+static Node *gen_lvar_init(Obj *lvar, Node* init){
+    /* 初期化式の単方向リスト */
+    Node head = {};
+    Node *cur = &head;
+    if(is_array((lvar -> ty))){
+        int idx = 0;
+        for(Node *rhs = init; rhs; rhs = rhs -> next){
+            Node *lhs =  new_unary(ND_DEREF, new_add(new_var_node(lvar), new_num_node(idx)));
+            Node *node = new_binary(ND_ASSIGN, lhs, rhs);
+            cur = cur -> next = new_unary(ND_EXPR_STMT, node);
+            idx++;
+            if(idx == lvar -> ty -> array_len){
+                break;
+            }
+        }
+    }else{
+        Node *node = new_binary(ND_ASSIGN, new_var_node(lvar), init); 
+        cur = cur -> next = new_unary(ND_EXPR_STMT, node);
+    }
+    return head.next;
+}
+
+static Node *lvar_initializer(Obj *lvar){
+    /* 初期化式の右辺の単方向リスト */
+    Node head = {};
+    Node *cur = &head;
+
+    if(is_array(lvar -> ty)){
+        int idx = 0;
+        if(is_str()){
+            if(lvar -> ty -> array_len == 0){
+                lvar -> ty -> array_len = token ->len + 1;
+            }
+            for(idx = 0; idx < token -> len && idx < lvar -> ty -> array_len; idx++){
+                cur = cur -> next = new_num_node(token -> str[idx]); 
+            }
+            next_token();
+        }else if(consume("{")){
+            while(!consume("}")){
+                cur = cur -> next = expr();
+                idx++;
+
+                if(is_equal(token, ",")){
+                    next_token();
+                }
+                if(lvar -> ty -> array_len == idx){
+                    skip_excess_elements();
+                }
+            }
+            /* 要素数が指定されていない場合サイズを修正する。*/
+            if(lvar -> ty -> array_len == 0){
+                lvar -> ty -> array_len = idx;
+                lvar -> ty -> size = lvar -> ty -> base -> size * idx;
+            }
+        }else{
+            error("invalid initializer"); // 配列の初期化式が不正
+        }
+        /* 初期か式の数が要素数よりも少ないときは、残りを0クリア。*/
+        if(idx < lvar -> ty -> array_len){
+            for(;idx != lvar -> ty -> array_len; idx++){
+                cur = cur -> next = new_num_node(0);
+            }
+        }
+    }else{
+        cur = cur -> next = expr();
+    }
+    return gen_lvar_init(lvar, head.next);
+}
+
 /* type-specifier declarator ("=" expr)? ("," declarator ("=" expr)?)* ";" */
 static Node *declaration(void){
     Type* base = type_specifier();
@@ -525,54 +582,10 @@ static Node *declaration(void){
     Node *cur = &head;
     while(!consume(";")){
         Type* ty = declarator(base);
-        Obj *var = new_lvar(get_ident(ty -> name), ty);
-
-        /* 要素数が指定されていないかつ初期か式がない配列定義はエラー */
-        if(var -> ty -> size == 0 && !is_equal(token, "=")){
-            error_at(var -> ty -> name -> str, "incomplete type is not allowed\n");
-        }
+        Obj *lvar = new_lvar(get_ident(ty -> name), ty);
 
         if(consume("=")){
-            if(var -> ty -> kind == TY_ARRAY){
-                int idx = 0;
-                if(is_str()){
-                    /* char s[] = "abc"; は s[0]='a'; s[1]='b'; s[2]='c';と解釈 */
-                    for(; idx < token -> len; idx++){
-                        Node *lhs =  new_unary(ND_DEREF, new_add(new_var_node(var), new_num_node(idx)));
-                        Node *rhs = new_num_node(token -> str[idx]);
-                        Node *node = new_binary(ND_ASSIGN, lhs, rhs);
-                        cur = cur -> next = new_unary(ND_EXPR_STMT, node);
-                    }
-                    next_token(); // TK_STRを読み飛ばす
-                }else{
-                    expect("{");
-                    do{
-                        Node *lhs = new_unary(ND_DEREF, new_add(new_var_node(var), new_num_node(idx)));
-                        Node *rhs = expr();
-                        Node *node = new_binary(ND_ASSIGN, lhs, rhs);
-                        cur = cur -> next = new_unary(ND_EXPR_STMT, node);
-                        idx++;
-                    }while(consume(","));
-                    expect("}");
-                }
-
-                /* 初期か式の数が要素数よりも少ないときは、残りを0クリアする。*/
-                if(idx < var -> ty -> array_len){
-                    for(;idx != var -> ty -> array_len; idx++){
-                        Node *lhs = new_unary(ND_DEREF, new_add(new_var_node(var), new_num_node(idx)));
-                        Node *rhs = new_num_node(0);
-                        Node *node = new_binary(ND_ASSIGN, lhs, rhs);
-                        cur = cur -> next = new_unary(ND_EXPR_STMT, node);
-                    }
-                }
-                /* 要素数が指定されていない場合サイズを修正する。*/
-                if(var -> ty -> size == 0){
-                    var -> ty -> size = var -> ty -> base -> size * idx;
-                }
-            }else{
-                Node *node = new_binary(ND_ASSIGN, new_var_node(var), expr()); 
-                cur = cur -> next = new_unary(ND_EXPR_STMT, node);
-            }
+           cur = cur -> next = lvar_initializer(lvar);
         }
         if(consume(",")){
             continue;

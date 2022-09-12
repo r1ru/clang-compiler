@@ -46,6 +46,10 @@ bool is_func(Type *ty){
     return ty -> kind == TY_FUNC;
 }
 
+bool is_array(Type *ty){
+    return ty -> kind == TY_ARRAY;
+}
+
 void add_type(Node *node) {
     /* 有効な値でないか、Nodeが既に型付けされている場合は何もしない。上書きを防ぐため。*/
     if (!node || node -> ty) 

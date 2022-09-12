@@ -57,7 +57,7 @@ struct Type{
 
     /* array */
     int array_len;
-    
+
     /* function type */
     Type *ret_ty;
     Type *next;
@@ -75,15 +75,16 @@ Type* copy_type(Type *ty);
 bool is_integer(Type *ty);
 bool is_ptr(Type* ty);
 bool is_func(Type *ty);
+bool is_array(Type *ty);
 void add_type(Node* np);
 
 /* parse.c */
-typedef struct Initializer Initializer;
-struct Initializer{
-    Initializer *next;
-    Node *expr;
-    char *data;
-    bool is_string; //初期化式の右辺が文字列かどうか
+/* グローバル変数の初期値 */
+typedef struct InitData InitData;
+struct InitData{
+    InitData *next;
+    int val;
+    char *label;
 };
 
 typedef struct Obj Obj;
@@ -94,9 +95,10 @@ struct Obj{
     char *name; // 変数の名前
     int offset; // RBPからのオフセット
 
-    char *init_data; // stirng literal
-    Initializer *initializer;
+    // global variable
     bool is_global;
+    char *str; // stirng literal or global char array
+    InitData *init_data;
 
     //function
     Obj *params;
