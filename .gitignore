@@ -3,6 +3,6 @@
 !*.*
 !Makefile
 *.o
-*.md
+memo.md
 tmp*
 a.out
