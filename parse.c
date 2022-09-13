@@ -491,21 +491,29 @@ static Member *struct_members(void){
 } 
 
 /* 構造体のメンバにoffsetを適用して合計サイズを返す */
-static int assign_member_offsets(Member *members){
+static int assign_member_offsets(Type *ty){
     int offset = 0;
-    for(Member *m = members; m; m = m -> next){
+    for(Member *m = ty -> members; m; m = m -> next){
+        offset = align_to(offset, m -> ty -> align);
         m -> offset = offset;
         offset += m -> ty -> size;
+        /* 構造体のalignmentは最もaligmenが大きいメンバに合わせる。*/
+        if(ty -> align < m -> ty -> align){
+            ty -> align = m -> ty -> align;
+        }
     }
-    return offset;
+
+    return align_to(offset, ty -> align);
 }
 
 /* struct-decl = "{" struct-members */
 static Type *struct_decl(void){
     expect("{");
-    Type *ty = new_type(TY_STRUCT);
+    Type *ty = calloc(1, sizeof(Type));
+    ty -> kind = TY_STRUCT;
     ty -> members = struct_members();
-    ty -> size = assign_member_offsets(ty -> members);
+    ty -> align = 1; 
+    ty -> size = assign_member_offsets(ty);
     return ty;
 }
 

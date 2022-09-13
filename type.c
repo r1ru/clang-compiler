@@ -1,29 +1,27 @@
 #include "9cc.h"
 
-Type *ty_long = &(Type){TY_LONG, 8};// 現状pointerの引き算の結果の型にしか使っていない。
-Type *ty_int = &(Type){TY_INT, 4};
-Type *ty_char =&(Type){TY_CHAR, 1};
+Type *ty_long = &(Type){TY_LONG, 8, 8};// 現状pointerの引き算の結果の型にしか使っていない。
+Type *ty_int = &(Type){TY_INT, 4, 4};
+Type *ty_char =&(Type){TY_CHAR, 1, 1};
 
-Type *new_type(TypeKind kind){
+Type *new_type(TypeKind kind, int size, int align){
     Type *ty = calloc(1, sizeof(Type));
     ty -> kind = kind;
+    ty -> size = size;
+    ty -> align = align;
     return ty;
 }
 
 Type* pointer_to(Type *base){
-    Type *ty = calloc(1, sizeof(Type));
-    ty -> kind = TY_PTR;
-    ty -> size = 8;
+    Type *ty = new_type(TY_PTR, 8, 8);
     ty -> base = base;
     return ty;
 }
 
 Type* array_of(Type *base, int array_len){
-    Type * ty = calloc(1, sizeof(Type));
-    ty -> kind = TY_ARRAY;
+    Type * ty = new_type(TY_ARRAY, base -> size * array_len, base -> align);
     ty -> base = base;
     ty -> array_len = array_len;
-    ty -> size = base -> size * array_len;
     return ty;
 }
 

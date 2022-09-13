@@ -54,6 +54,7 @@ typedef struct Type Type;
 struct Type{
     TypeKind kind;
     int size;
+    int align; // alignment
     Token *name;
     Type *base;
 
@@ -73,7 +74,7 @@ extern Type *ty_long;
 extern Type *ty_int;
 extern Type *ty_char;
 
-Type *new_type(TypeKind kind);
+Type *new_type(TypeKind kind, int size, int align);
 Type* pointer_to(Type *base);
 Type* array_of(Type *base, int len);
 Type* func_type(Type *ret_ty);
@@ -178,6 +179,7 @@ Obj* parse(void);
 
 /* codegen.c */
 void codegen(Obj *program);
+int align_to(int offset, int align);
 
 /* debug.c */
 extern FILE* debug;

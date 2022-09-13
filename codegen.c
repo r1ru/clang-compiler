@@ -251,7 +251,7 @@ static void store_arg(int i, int offset, unsigned int size){
     fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg64[i]);
 }
 
-static int align_to(int offset, int align){
+int align_to(int offset, int align){
     return (offset + align - 1) / align * align;
 }
 
