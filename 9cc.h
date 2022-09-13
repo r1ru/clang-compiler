@@ -14,6 +14,7 @@
 #define ERROR stderr
 
 typedef struct Node Node;
+typedef struct Member Member;
 
 /* tokenize.c */
 typedef struct Token Token;
@@ -45,7 +46,8 @@ typedef enum{
     TY_CHAR,
     TY_PTR,
     TY_FUNC,
-    TY_ARRAY
+    TY_ARRAY,
+    TY_STRUCT
 }TypeKind;
 
 typedef struct Type Type;
@@ -58,6 +60,9 @@ struct Type{
     /* array */
     int array_len;
 
+    /* struct members */
+    Member *members;
+
     /* function type */
     Type *ret_ty;
     Type *next;
@@ -68,6 +73,7 @@ extern Type *ty_long;
 extern Type *ty_int;
 extern Type *ty_char;
 
+Type *new_type(TypeKind kind);
 Type* pointer_to(Type *base);
 Type* array_of(Type *base, int len);
 Type* func_type(Type *ret_ty);
@@ -76,9 +82,18 @@ bool is_integer(Type *ty);
 bool is_ptr(Type* ty);
 bool is_func(Type *ty);
 bool is_array(Type *ty);
+bool is_struct(Type *ty);
 void add_type(Node* np);
 
 /* parse.c */
+/* 構造体のメンバ情報 */
+struct Member{
+    Member *next;
+    Type *ty;
+    Token *name;
+    int offset;    
+};
+
 /* グローバル変数の初期値 */
 typedef struct InitData InitData;
 struct InitData{
@@ -128,7 +143,8 @@ typedef enum{
     ND_BLOCK, // {}
     ND_FUNCCALL, // function call
     ND_ADDR, // unary &
-    ND_DEREF // unary *
+    ND_DEREF, // unary *
+    ND_MEMBER // .
 }NodeKind;
 
 struct Node{
@@ -145,6 +161,8 @@ struct Node{
     Node* els; 
     Node* init; 
     Node* inc; 
+
+    Member *member; // 構造体のメンバ
 
     char* funcname; // function name
     Node* args; // argments;

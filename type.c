@@ -4,6 +4,12 @@ Type *ty_long = &(Type){TY_LONG, 8};// 現状pointerの引き算の結果の型�
 Type *ty_int = &(Type){TY_INT, 4};
 Type *ty_char =&(Type){TY_CHAR, 1};
 
+Type *new_type(TypeKind kind){
+    Type *ty = calloc(1, sizeof(Type));
+    ty -> kind = kind;
+    return ty;
+}
+
 Type* pointer_to(Type *base){
     Type *ty = calloc(1, sizeof(Type));
     ty -> kind = TY_PTR;
@@ -48,6 +54,10 @@ bool is_func(Type *ty){
 
 bool is_array(Type *ty){
     return ty -> kind == TY_ARRAY;
+}
+
+bool is_struct(Type *ty){
+    return ty -> kind == TY_STRUCT;
 }
 
 void add_type(Node *node) {
@@ -116,5 +126,8 @@ void add_type(Node *node) {
                 node -> ty = stmt -> rhs -> ty;
                 return;
             }
+            
+        case ND_MEMBER:
+            node -> ty = node -> member -> ty;
         }
 }

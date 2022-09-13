@@ -189,7 +189,7 @@ static Node* new_var_node(Obj *var){
     return np;
 }
 
-static Type* type_specifier(void);
+static Type* delspec(void);
 static Type* func_params(Type *ret_ty);
 static Type* type_suffix(Type *ty);
 static Type* declarator(Type *ty);
@@ -317,7 +317,7 @@ static void gvar_initializer(Obj *gvar){
 Obj * parse(void){
     globals = NULL;
     while(!at_eof()){
-        Type *base = type_specifier();
+        Type *base = delspec();
         Type *ty = declarator(base);
         if(is_func(ty)){
             function(ty);
@@ -432,7 +432,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(void){
-    return is_equal(token, "int") || is_equal(token, "char");
+    return is_equal(token, "int") || is_equal(token, "char") || is_equal(token, "struct");
 }
 
 /* compound-stmt = (declaration | stmt)* "}" */
@@ -455,12 +455,70 @@ static Node* compound_stmt(void){
     return node;
 }
 
-static Type* type_specifier(void){
+static Member *new_member(Token *name, Type *ty){
+    struct Member *member = calloc(1, sizeof(Member));
+    member -> name = name;
+    member -> ty = ty;
+    return member;
+}
+
+
+/* decl = delsepc declarator ( "," declarator)* ";" */
+static Member *decl(void){
+    Member head = {};
+    Member *cur = &head;
+    Type *base = delspec();
+    do{
+        Type *ty = declarator(base);
+        cur = cur -> next = new_member(ty -> name, ty);
+        if(!consume(",")){
+            break;
+        }
+    }while(!is_equal(token, ";"));
+    expect(";");
+    return head.next;
+}
+
+/* struct-members = decl ("," decl )* "}" */
+static Member *struct_members(void){
+    Member head = {};
+    Member *cur = &head;
+
+    while(!consume("}")){
+        cur = cur -> next = decl();
+    }
+    return head.next;
+} 
+
+/* 構造体のメンバにoffsetを適用して合計サイズを返す */
+static int assign_member_offsets(Member *members){
+    int offset = 0;
+    for(Member *m = members; m; m = m -> next){
+        m -> offset = offset;
+        offset += m -> ty -> size;
+    }
+    return offset;
+}
+
+/* struct-decl = "{" struct-members */
+static Type *struct_decl(void){
+    expect("{");
+    Type *ty = new_type(TY_STRUCT);
+    ty -> members = struct_members();
+    ty -> size = assign_member_offsets(ty -> members);
+    return ty;
+}
+
+/* delspec = "int" | "char" | struct-decl*/
+static Type* delspec(void){
     if(consume("int")){
         return ty_int;
     }
     if(consume("char")){
         return ty_char;
+    }
+    if(consume("struct")){
+        return struct_decl();
     }
     error_at(token -> str, "unknown type");
 }
@@ -473,7 +531,7 @@ static Type* func_params(Type *ret_ty){
     Type *func = func_type(ret_ty);
     if(!is_equal(token, ")")){
         do{
-            Type *base = type_specifier();
+            Type *base = delspec();
             Type *ty = declarator(base);
             cur = cur -> next = copy_type(ty); // copyしないと上書きされる可能性があるから。
         }while(consume(","));   
@@ -586,9 +644,9 @@ static Node *lvar_initializer(Obj *lvar){
     return gen_lvar_init(lvar, head.next);
 }
 
-/* type-specifier declarator ("=" expr)? ("," declarator ("=" expr)?)* ";" */
+/* delspec declarator ("=" expr)? ("," declarator ("=" expr)?)* ";" */
 static Node *declaration(void){
-    Type* base = type_specifier();
+    Type* base = delspec();
     Node head = {};
     Node *cur = &head;
     while(!consume(";")){
@@ -760,15 +818,45 @@ static Node* unary(void){
     return postfix();
 }
 
-/* postfix = primary ("[" expr "]")? */
+Member *get_struct_member(Type *ty, Token *name){
+    for(Member *m = ty -> members; m; m = m -> next){
+        if(m -> name -> len == name -> len && !strncmp(m -> name -> str, name -> str, name -> len)){
+            return m;
+        }
+    }
+    error("%.*s: no such member", name -> len, name -> str);
+}
+
+static Node *struct_ref(Node *lhs, Token *name){
+    add_type(lhs);
+    if(!is_struct(lhs -> ty)){
+        error_at(lhs -> ty -> name -> str, "not a struct");
+    }
+    Member *member = get_struct_member(lhs -> ty, name);
+    Node *node = new_node(ND_MEMBER);
+    node -> lhs = lhs;
+    node -> member = member;
+    return node;
+}
+
+/* postfix  = primary ("[" expr "]")?
+            | primary ("." ident)*  */
 static Node* postfix(void){
     Node *np = primary();
-    if(consume("[")){
-        Node *idx = expr();
-        np = new_unary(ND_DEREF, new_add(np, idx));
-        expect("]");
+    for(;;){
+        if(consume("[")){
+            Node *idx = expr();
+            np = new_unary(ND_DEREF, new_add(np, idx));
+            expect("]");
+            continue;
+        }
+        if(consume(".")){
+            np = struct_ref(np, token);
+            next_token();
+            continue;
+        }
+        return np;
     }
-    return np;
 }
 
 /* primary  = num

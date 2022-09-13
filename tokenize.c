@@ -64,7 +64,7 @@ static bool startswith(char* p1, char* p2){
 
 /* keywordだった場合、keywordの長さを返す。それ以外の時0 */
 static size_t is_keyword(char* p){
-    static char* kw[] = {"return", "if", "else", "while", "for", "int", "sizeof", "char"};
+    static char* kw[] = {"return", "if", "else", "while", "for", "int", "sizeof", "char", "struct"};
     for(size_t i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(strncmp(p, kw[i], strlen(kw[i])) == 0){
             return strlen(kw[i]);
@@ -127,7 +127,7 @@ void tokenize(char *path, char* p){
 
          /* 一文字の予約記号
         strchrは第一引数で渡された検索対象から第二引数の文字を探してあればその文字へのポインターを、なければNULLを返す。*/
-        if(strchr("+-*/()<>;={},&*[]", *p)){
+        if(strchr("+-*/()<>;={},&*[].", *p)){
             cur = new_token(TK_RESERVED, cur, p, 1);
             p++;
             continue;

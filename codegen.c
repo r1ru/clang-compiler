@@ -64,6 +64,12 @@ static void gen_addr(Node *np) {
         case ND_DEREF:
             gen_expr(np -> rhs);
             return;
+        
+        /* x.aはxのアドレス + aのoffset */
+        case ND_MEMBER:
+            gen_addr(np -> lhs);
+            fprintf(STREAM, "\tadd rax, %d\n", np -> member -> offset);
+            return;
     }
     error("代入の左辺値が変数ではありません");
 }
@@ -76,6 +82,7 @@ static void gen_expr(Node* np){
             return;
         
         case ND_VAR:
+        case ND_MEMBER:
             gen_addr(np);
             load(np -> ty);
             return;
@@ -345,7 +352,7 @@ static void emit_text(Obj *globals){
 void codegen(Obj *globals){
     fprintf(STREAM, ".intel_syntax noprefix\n");
     assign_lvar_offsets(globals);
-    display_globals(globals);
+    //display_globals(globals);
     emit_data(globals);
     emit_text(globals);
 }

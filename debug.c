@@ -78,6 +78,14 @@ static void type_info(Type *ty){
             }
             fprintf(debug, ")");
             return;
+        
+        case TY_STRUCT:
+            fprintf(debug, "struct total: %d bytes\n", ty -> size);
+            for(Member *m = ty -> members; m; m = m -> next){
+                type_info(m -> ty);
+                fprintf(debug, " %.*s offset: %d\n", m -> name -> len,m -> name -> str, m -> offset);
+            }
+            return;
     }
 }
 
@@ -87,7 +95,7 @@ static void display_obj(Obj *obj, bool is_global){
     if(obj -> str){
         fprintf(debug, " \"%s\"", obj -> str);
     }
-    if(!is_global){
+    if(!is_global && obj -> ty -> kind != TY_STRUCT){
         fprintf(debug, " offset: %d", obj -> offset);
     }else{
         if(obj -> init_data){
@@ -122,7 +130,6 @@ static void display_func(Obj *func){
     fprintf(debug, " %s:\n", func -> name);
     fprintf(debug, "\t[%d bytes stack]\n", func -> stack_size);
     for(Obj *lvar = func -> locals; lvar; lvar = lvar -> next){
-        fprintf(debug, "\t");
         display_obj(lvar, false);
     }
 }
