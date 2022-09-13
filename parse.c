@@ -58,27 +58,6 @@ static void push_tag_scope(char *name, Type *ty){
     scope -> tags = tsc;
 }
 
-/* 次のトークンを読む。(tokenを更新するのはこの関数のみ) */
-static void next_token(void){
-    token = token -> next;
-}
-
-/* トークンの記号が期待したもののときtrue。それ以外の時false */
-static bool is_equal(Token *tok, char *op){
-    if(strlen(op) != tok -> len || strncmp(op, tok -> str, tok -> len))
-        return false;
-    return true;
-}
-
-/* トークンが期待した記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
-static bool consume(char* op){
-    if(is_equal(token, op)){
-        next_token();
-        return true;
-    }
-    return false;
-}
-
 static char* strndup(char* str, int len){
     char *s = calloc(1, len + 1);
     return strncpy(s, str, len);
@@ -88,35 +67,6 @@ static char* strndup(char* str, int len){
 static char* get_ident(Token* tp){
     char* name = calloc(1, tp -> len + 1); // null終端するため。
     return strncpy(name, tp -> str, tp -> len);
-}
-
-static bool is_ident(void){
-    return token -> kind == TK_IDENT;
-}
-
-static bool is_str(void){
-    return token -> kind == TK_STR;
-}
-
-/* トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
-static void expect(char* op){
-    if(strlen(op) != token -> len || strncmp(op, token -> str, token -> len))
-        error_at(token->str, "%sではありません\n", op);
-    next_token();
-}
-
-/* TK_NUM用。トークンが数値の時にトークンを読み進めて数値を返す。それ以外の時エラー */
-static int expect_number(void){
-    if(token -> kind != TK_NUM)
-        error_at(token -> str, "数ではありません\n");
-    int val = token -> val;
-    next_token();
-    return val;
-}
-
-/* TK_EOF用。トークンがEOFかどうかを返す。*/
-static bool at_eof(void){
-    return token -> kind == TK_EOF;
 }
 
 /* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */

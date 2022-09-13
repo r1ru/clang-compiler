@@ -5,15 +5,18 @@ FILE* debug;
 static void display_token(Token *tp){
 
     switch(tp -> kind){
-
-        case TK_RESERVED:
-            fprintf(debug, "TK_RESERVED, str: %.*s\n", tp -> len, tp -> str);
-            return;
-
         case TK_IDENT:
             fprintf(debug, "TK_IDENT, ident: %.*s\n", tp -> len , tp -> str);
             return;
 
+        case TK_PUNCT:
+            fprintf(debug, "TK_PUNCT, str: %.*s\n", tp -> len, tp -> str);
+            return;
+
+        case TK_KEYWORD:
+            fprintf(debug, "TK_KEYWORD, str: %.*s\n", tp -> len, tp -> str);
+            return;
+    
         case TK_NUM:
             fprintf(debug, "TK_NUM, val: %d\n", tp -> val);
             return;

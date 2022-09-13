@@ -20,8 +20,9 @@ typedef struct Member Member;
 typedef struct Token Token;
 
 typedef enum{
-    TK_RESERVED,
-    TK_IDENT, // 識別子
+    TK_IDENT, // identifier
+    TK_PUNCT, // punctuator
+    TK_KEYWORD, // keyword
     TK_NUM,
     TK_STR,
     TK_EOF
@@ -37,6 +38,12 @@ struct Token{
 
 void error(char *fmt, ...);
 void error_at(char *loc, char* fmt, ...);
+bool is_ident(void);
+bool is_str(void);
+bool at_eof(void);
+void next_token(void);
+bool is_equal(Token *tok, char *op);
+bool consume(char* op);
 void tokenize(char *path, char* p);
 
 /* type.c */

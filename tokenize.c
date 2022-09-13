@@ -47,14 +47,64 @@ void error_at(char *loc, char* fmt, ...){
     exit(1);
 }
 
-/* 新しいtokenを作成してcurにつなげる。*/
-static Token* new_token(TokenKind kind, Token* cur, char* str, int len){
-    Token* tp = calloc(1, sizeof(Token));
-    tp -> kind = kind;
-    tp -> str = str;
-    tp -> len = len;
-    cur -> next = tp;
-    return tp;
+/* Token操作用の関数 */
+bool is_ident(void){
+    return token -> kind == TK_IDENT;
+}
+
+bool is_str(void){
+    return token -> kind == TK_STR;
+}
+
+/* TK_EOF用。トークンがEOFかどうかを返す。*/
+bool at_eof(void){
+    return token -> kind == TK_EOF;
+}
+
+/* 次のトークンを読む。(tokenを更新するのはこの関数のみ) */
+void next_token(void){
+    token = token -> next;
+}
+
+/* トークンの記号が期待したもののときtrue。それ以外の時false */
+bool is_equal(Token *tok, char *op){
+    if(strlen(op) != tok -> len || strncmp(op, tok -> str, tok -> len))
+        return false;
+    return true;
+}
+
+/* トークンが期待した記号のときはトークンを読み進めて真を返す。それ以外のときは偽を返す。*/
+bool consume(char* op){
+    if(is_equal(token, op)){
+        next_token();
+        return true;
+    }
+    return false;
+}
+
+/* トークンが期待した記号の時はトークンを読み進めて真を返す。それ以外の時にエラー */
+void expect(char* op){
+    if(!is_equal(token, op))
+        error_at(token->str, "%sではありません\n", op);
+    next_token();
+}
+
+/* TK_NUM用。トークンが数値の時にトークンを読み進めて数値を返す。それ以外の時エラー */
+int expect_number(void){
+    if(token -> kind != TK_NUM)
+        error_at(token -> str, "数ではありません\n");
+    int val = token -> val;
+    next_token();
+    return val;
+}
+
+/* 新しいtokenを作成する */
+static Token* new_token(TokenKind kind, char *start, char *end){
+    Token* tok = calloc(1, sizeof(Token));
+    tok -> kind = kind;
+    tok -> str = start;
+    tok -> len = end - start;
+    return tok;
 }
 
 /* 文字列を比較。memcmpは成功すると0を返す。 */
@@ -63,25 +113,36 @@ static bool startswith(char* p1, char* p2){
 }
 
 /* keywordだった場合、keywordの長さを返す。それ以外の時0 */
-static size_t is_keyword(char* p){
+static int read_keyword(char* p){
     static char* kw[] = {"return", "if", "else", "while", "for", "int", "sizeof", "char", "struct"};
-    for(size_t i =0; i < sizeof(kw) / sizeof(*kw); i++){
-        if(strncmp(p, kw[i], strlen(kw[i])) == 0){
+    for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
+        if(startswith(p, kw[i])){
             return strlen(kw[i]);
         }
     }
     return 0;
 }
 
+/* 区切り文字だった場合長さを返す */
+static int read_puct(char *p){
+    static char* kw[] = {"==", "!=", "<=", ">="};
+    for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
+        if(startswith(p, kw[i])){
+            return strlen(kw[i]);
+        }
+    }
+    // +-*/()<>;={},&[].
+    return ispunct(*p) ? 1 : 0;
+}
+
 /* 入力文字列をトークナイズしてそれを返す */
 void tokenize(char *path, char* p){
     Token head; /* これは無駄になるがスタック領域なのでオーバーヘッドは0に等しい */
     Token* cur = &head;
-    char *q;
 
     current_path = path;
     current_input = p;
-    
+
     while(*p){
         /* is~関数は偽のときに0を、真の時に0以外を返す。*/
         /* spaceだった場合は無視。 */
@@ -110,53 +171,18 @@ void tokenize(char *path, char* p){
 
         /* 数値だった場合 */
         if(isdigit(*p)){
-            cur = new_token(TK_NUM, cur, p, 0);
-            q = p;
+            cur = cur -> next = new_token(TK_NUM, p, p);
+            char *q = p;
             cur -> val = strtol(p, &p, 10);
             cur -> len = p - q; /* 長さを記録 */
             continue;
         }
 
-        /* 2文字の予約記号 */
-        /* 可変長operator。これを先に置かないと例えば<=が<と=という二つに解釈されてしまう。*/
-        if(startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=")) {
-            cur = new_token(TK_RESERVED, cur, p, 2);
-            p += 2;
-            continue;
-        }
-
-         /* 一文字の予約記号
-        strchrは第一引数で渡された検索対象から第二引数の文字を探してあればその文字へのポインターを、なければNULLを返す。*/
-        if(strchr("+-*/()<>;={},&*[].", *p)){
-            cur = new_token(TK_RESERVED, cur, p, 1);
-            p++;
-            continue;
-        }
-
-        size_t len = is_keyword(p);
-        if(len){
-            cur = new_token(TK_RESERVED, cur, p, len);
-            p += len;
-            continue;
-        }
-
-        /* ローカル変数の場合(数字が使用される可能性もあることに注意。) */
-        if(isalnum(*p)){
-            cur = new_token(TK_IDENT, cur, p, 0);
-            q = p;
-            while(isalnum(*p)){
-                p++;
-            }
-            cur -> len = p - q; /* 長さを記録 */
-            
-            continue;
-        }
-
-        /* 文字列リテラルの場合*/
+        /* 文字列リテラルの場合 */
         if(*p == '"'){
             p++; // '"'を読み飛ばす
-            cur = new_token(TK_STR, cur, p, 0);
-            q = p;
+            cur = cur -> next = new_token(TK_STR, p, p);
+            char *q = p;
             for(; *p != '"'; p++){
                 if(*p == '\\'){
                     p++; // '\'の次にある文字を飛ばす。(一字的な措置。)
@@ -167,13 +193,42 @@ void tokenize(char *path, char* p){
             continue;
         }
 
+        /* keywords */
+        int keyword_len = read_keyword(p);
+        if(keyword_len){
+            cur = cur -> next = new_token(TK_KEYWORD, p, p + keyword_len);
+            p += keyword_len;
+            continue;
+        }
+
+
+        /* ローカル変数の場合(数字が使用される可能性もあることに注意。) */
+        if(isalnum(*p)){
+            cur = cur -> next = new_token(TK_IDENT, p, p);
+            char *q = p;
+            while(isalnum(*p)){
+                p++;
+            }
+            cur -> len = p - q; /* 長さを記録 */
+            
+            continue;
+        }
+        
+        /* puctuators */
+        int punct_len = read_puct(p);
+        if(punct_len){
+            cur = cur -> next = new_token(TK_PUNCT, p, p + punct_len);
+            p += punct_len;
+            continue;
+        }
+
         /* それ以外 */
         error_at(p, "トークナイズできません\n");
     }
 
     /* 終了を表すトークンを作成 */
-    cur = new_token(TK_EOF, cur, p, 0);
-    
+    cur = cur -> next = new_token(TK_EOF, p, p);
+
     /* トークンの先頭へのポインタをセット */
     token = head.next;
 
