@@ -849,7 +849,7 @@ static Node *struct_ref(Node *lhs, Token *name){
 }
 
 /* postfix  = primary ("[" expr "]")?
-            | primary ("." ident)*  */
+            | primary ("." ident | "->" ident)*  */
 static Node* postfix(void){
     Node *np = primary();
     for(;;){
@@ -860,6 +860,12 @@ static Node* postfix(void){
             continue;
         }
         if(consume(".")){
+            np = struct_ref(np, token);
+            next_token();
+            continue;
+        }
+        if(consume("->")){
+            np = new_unary(ND_DEREF, np);
             np = struct_ref(np, token);
             next_token();
             continue;
