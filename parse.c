@@ -13,11 +13,19 @@ struct VarScope {
     Obj *var;
 };
 
-typedef struct Scope Scope;
+typedef struct TagScope TagScope;
+struct TagScope{
+    TagScope *next;
+    char *name;
+    Type *ty;
+};
 
+typedef struct Scope Scope;
+/* Cには変数のスコープと構造体タグのスコープがある */
 struct Scope{
     Scope *next;
     VarScope *vars;
+    TagScope *tags;
 };
 
 static Scope *scope = &(Scope){}; //現在のスコープ
@@ -32,12 +40,22 @@ static void leave_scope(void){
     scope = scope -> next;
 }
 
+/* 現在のScopeに変数を登録 */
 static void push_scope(char *name, Obj *var){
     VarScope *vsc = calloc(1, sizeof(VarScope));
     vsc -> name = name;
     vsc -> var = var;
     vsc -> next = scope -> vars;
     scope -> vars = vsc;
+}
+
+/* 現在のScopeにstruct tagを登録 */
+static void push_tag_scope(char *name, Type *ty){
+    TagScope *tsc = calloc(1, sizeof(TagScope));
+    tsc -> name = name;
+    tsc -> ty = ty;
+    tsc -> next = scope -> tags;
+    scope -> tags = tsc;
 }
 
 /* 次のトークンを読む。(tokenを更新するのはこの関数のみ) */
@@ -107,6 +125,18 @@ static Obj *find_var(Token* tok) {
         for(VarScope *vsc = sc -> vars; vsc; vsc = vsc -> next){
             if(is_equal(tok, vsc -> name)){
                 return vsc -> var;
+            }
+        }
+    }
+    return NULL;
+}
+
+/* struct tagを名前で検索する(同じタグ名の場合新しいほうが優先される。) */
+static Type* find_tag(Token *tok){
+    for(Scope *sc = scope; sc; sc = sc -> next){
+        for(TagScope *tsc = sc -> tags; tsc; tsc = tsc -> next){
+            if(is_equal(tok, tsc -> name)){
+                return tsc -> ty;
             }
         }
     }
@@ -506,14 +536,35 @@ static int assign_member_offsets(Type *ty){
     return align_to(offset, ty -> align);
 }
 
-/* struct-decl = "{" struct-members */
+/* struct-decl = ident? "{" struct-members */
 static Type *struct_decl(void){
+    Token *tag = NULL;
+
+    /* 構造体tag */
+    if(is_ident()){
+        tag = token;
+        next_token();
+    }
+
+    /* タグ名で検索 */
+    if(tag && !is_equal(token, "{")){
+        Type *ty = find_tag(tag);
+        if(!tag){
+            error_at(tag -> str, "unknow struct type");
+        }
+        return ty;
+    }
     expect("{");
     Type *ty = calloc(1, sizeof(Type));
     ty -> kind = TY_STRUCT;
     ty -> members = struct_members();
     ty -> align = 1; 
     ty -> size = assign_member_offsets(ty);
+
+    /* tag名が指定されていた場合はリストに登録する */
+    if(tag){
+        push_tag_scope(get_ident(tag), ty);
+    }
     return ty;
 }
 
