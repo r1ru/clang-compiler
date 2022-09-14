@@ -134,6 +134,7 @@ struct Obj{
     InitData *init_data;
 
     //function
+    bool is_definition;
     Obj *params;
     Obj *locals;
     Node *body;

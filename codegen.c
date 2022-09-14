@@ -344,7 +344,7 @@ static void emit_data(Obj *globals){
 static void emit_text(Obj *globals){
     fprintf(STREAM, ".text\n");
     for(Obj *fn = globals; fn; fn = fn -> next){
-        if(!is_func(fn -> ty)){
+        if(!is_func(fn -> ty) || !fn -> is_definition){
             continue;
         }
         current_fn = fn;

@@ -293,8 +293,7 @@ static void gvar_initializer(Obj *gvar){
     gen_gvar_init(gvar, head.next);
 }
 
-/* program  = type-specifier declarator ";"
-            | type-specifier declarator body */
+/* program = (function-definition | global-variable)* */
 Obj * parse(void){
     globals = NULL;
     while(!at_eof()){
@@ -329,10 +328,15 @@ static void create_param_lvars(Type* param){
     }
 }
 
-/* function = "{" compound_stmt */
+/* function = ";" | "{" compound_stmt */
 static void function(Type *ty){
-    locals = NULL;
     Obj* func = new_gvar(get_ident(ty -> name), ty);
+    func -> is_definition = !consume(";");
+
+    if(!func -> is_definition)
+        return;
+    
+    locals = NULL;
     enter_scope(); //仮引数を関数のスコープに入れるため。
     create_param_lvars(ty -> params);
     func -> params = locals;
