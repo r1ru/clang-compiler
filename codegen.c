@@ -23,37 +23,47 @@ static void load(Type* ty){
     if(ty -> kind == TY_ARRAY){
         return;
     }
-    if(ty -> size == 1){
-        fprintf(STREAM, "\tmovzx eax, BYTE PTR [rax]\n"); 
-        return;
-    }    
-    if(ty -> size == 2){
-        fprintf(STREAM, "\tmovsx rax, WORD PTR [rax]\n");
-        return;
+
+    /* sxはsign extendedの略 */
+    switch(ty -> size){
+        case 1:
+            fprintf(STREAM, "\tmovsx eax, BYTE PTR [rax]\n"); 
+            return;
+        
+        case 2:
+            fprintf(STREAM, "\tmovsx eax, BYTE PTR [rax]\n"); 
+            return;
+
+        case 4:
+            fprintf(STREAM, "\tmovsxd rax, [rax]\n");
+            return;
+        
+        default:
+            fprintf(STREAM, "\tmov rax, [rax]\n");
+            return;
     }
-    if(ty -> size == 4){
-        fprintf(STREAM, "\tmov eax, [rax]\n");
-        return;
-    }
-    fprintf(STREAM, "\tmov rax, [rax]\n");
 }
 
 /* スタックに積まれているアドレスに値を格納。*/
 static void store(Type *ty){
     pop("rdi");
-    if(ty -> size == 1){
-        fprintf(STREAM, "\tmov [rdi], al\n");
-        return;
+    switch (ty -> size){
+        case 1:
+            fprintf(STREAM, "\tmov [rdi], al\n");
+            return;
+        
+        case 2:
+            fprintf(STREAM, "\tmov [rdi], ax\n");
+            return;
+        
+        case 4:
+            fprintf(STREAM, "\tmov [rdi], eax\n");
+            return;
+        
+        default:
+            fprintf(STREAM, "\tmov [rdi], rax\n"); 
+            return;
     }
-    if(ty -> size == 2){
-        fprintf(STREAM, "\tmov [rdi], ax\n");
-        return;
-    }
-    if(ty -> size == 4){
-        fprintf(STREAM, "\tmov [rdi], eax\n");
-        return;
-    }
-    fprintf(STREAM, "\tmov [rdi], rax\n"); 
 }
 
 static void gen_expr(Node* np);
@@ -249,19 +259,23 @@ static void gen_stmt(Node* np){
 }
 
 static void store_arg(int i, int offset, unsigned int size){
-    if(size == 1){
-        fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg8[i]);
-        return;
+    switch(size){
+        case 1:
+            fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg8[i]);
+            return;
+        
+        case 2:
+            fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg16[i]);
+            return;
+        
+        case 4:
+            fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg32[i]);
+            return;
+        
+        default:
+            fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg64[i]);
+            return;
     }
-    if(size == 2){
-        fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg16[i]);
-        return;
-    }
-    if(size == 4){
-        fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg32[i]);
-        return;
-    }
-    fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg64[i]);
 }
 
 int align_to(int offset, int align){
