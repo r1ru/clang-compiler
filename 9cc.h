@@ -53,6 +53,7 @@ void tokenize(char *path, char* p);
 typedef enum{
     TY_LONG,
     TY_INT,
+    TY_SHORT,
     TY_CHAR,
     TY_PTR,
     TY_FUNC,
@@ -83,6 +84,7 @@ struct Type{
 
 extern Type *ty_long;
 extern Type *ty_int;
+extern Type *ty_short;
 extern Type *ty_char;
 
 Type *new_type(TypeKind kind, int size, int align);

@@ -4,6 +4,7 @@ static Obj *current_fn; // 現在コードを生成している関数
 static unsigned int llabel_index; // ローカルラベル用のインデックス
 static char* argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static char* argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
+static char* argreg16[] = {"di", "si", "dx", "cx", "r8w", "r9w"};
 static char* argreg8[] = {"dil", "sil", "dl", "cl", "r8b", "r9b" };
 
 static void gen_expr(Node* np);
@@ -26,6 +27,10 @@ static void load(Type* ty){
         fprintf(STREAM, "\tmovzx eax, BYTE PTR [rax]\n"); 
         return;
     }    
+    if(ty -> size == 2){
+        fprintf(STREAM, "\tmovsx rax, WORD PTR [rax]\n");
+        return;
+    }
     if(ty -> size == 4){
         fprintf(STREAM, "\tmov eax, [rax]\n");
         return;
@@ -38,6 +43,10 @@ static void store(Type *ty){
     pop("rdi");
     if(ty -> size == 1){
         fprintf(STREAM, "\tmov [rdi], al\n");
+        return;
+    }
+    if(ty -> size == 2){
+        fprintf(STREAM, "\tmov [rdi], ax\n");
         return;
     }
     if(ty -> size == 4){
@@ -242,6 +251,10 @@ static void gen_stmt(Node* np){
 static void store_arg(int i, int offset, unsigned int size){
     if(size == 1){
         fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg8[i]);
+        return;
+    }
+    if(size == 2){
+        fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg16[i]);
         return;
     }
     if(size == 4){

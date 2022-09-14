@@ -413,7 +413,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(void){
-    return is_equal(token, "int") || is_equal(token, "char") || is_equal(token, "long") || is_equal(token, "struct") || is_equal(token, "union");
+    return is_equal(token, "int") || is_equal(token, "char") || is_equal(token, "short") || is_equal(token, "long") || is_equal(token, "struct") || is_equal(token, "union");
 }
 
 /* compound-stmt = (declaration | stmt)* "}" */
@@ -544,6 +544,9 @@ static Type* delspec(void){
     }
     if(consume("long")){
         return ty_long;
+    }
+    if(consume("short")){
+        return ty_short;
     }
     if(consume("struct")){
         return struct_decl();
