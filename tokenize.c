@@ -203,10 +203,10 @@ void tokenize(char *path, char* p){
 
 
         /* ローカル変数の場合(数字が使用される可能性もあることに注意。) */
-        if(isalnum(*p)){
+        if(isalnum(*p) || *p == '_'){
             cur = cur -> next = new_token(TK_IDENT, p, p);
             char *q = p;
-            while(isalnum(*p)){
+            while(isalnum(*p) || *p == '_'){
                 p++;
             }
             cur -> len = p - q; /* 長さを記録 */

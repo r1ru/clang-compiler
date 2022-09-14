@@ -21,11 +21,11 @@ int addx(int *x, int y) {
   return *x + y;
 }
 
-int subchar(char a, char b, char c) {
+int sub_char(char a, char b, char c) {
   return a - b - c;
 }
 
-int sublong(long a, long b, long c) {
+int sub_long(long a, long b, long c) {
   return a - b - c;
 }
 
@@ -47,9 +47,9 @@ int main() {
     ASSERT(1, sub2(4,3));
     ASSERT(55, fib(9));
 
-    ASSERT(1, ({ subchar(7, 3, 3); }));
+    ASSERT(1, ({ sub_char(7, 3, 3); }));
 
-    ASSERT(1, sublong(7, 3, 3));
+    ASSERT(1, sub_long(7, 3, 3));
 
     printf("OK\n");
     return 0;
