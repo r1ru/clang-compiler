@@ -190,10 +190,4 @@ Obj* parse(void);
 void codegen(Obj *program);
 int align_to(int offset, int align);
 
-/* debug.c */
-extern FILE* debug;
-
-void check_tokenizer_output(Token* head);
-void display_globals(Obj *globals);
-
 #endif

@@ -231,7 +231,4 @@ void tokenize(char *path, char* p){
 
     /* トークンの先頭へのポインタをセット */
     token = head.next;
-
-    /* debug info */
-    check_tokenizer_output(token);
 }

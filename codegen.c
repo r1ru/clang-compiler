@@ -352,7 +352,6 @@ static void emit_text(Obj *globals){
 void codegen(Obj *globals){
     fprintf(STREAM, ".intel_syntax noprefix\n");
     assign_lvar_offsets(globals);
-    //display_globals(globals);
     emit_data(globals);
     emit_text(globals);
 }

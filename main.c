@@ -36,14 +36,6 @@ int main(int argc, char* argv[]){
         return EXIT_FAILURE;
     }
 
-    /* debugメッセージ出力用のファイルをオープン */
-    debug = fopen("debug", "w");
-    if(debug == NULL){
-        perror("fopen");
-        return 1;
-    }
-    setbuf(debug, NULL);
-
     /* ファイルから入力を読み込む */
     char *buf = read_file(argv[1]);
     
@@ -54,12 +46,6 @@ int main(int argc, char* argv[]){
     Obj *program = parse();
 
     codegen(program);
-
-    /* debug用のファイル記述子をclose */
-    if(fclose(debug) == EOF){
-        perror("fclose");
-        return 1;
-    }
     
     return 0;
 }
