@@ -4,6 +4,7 @@ Type *ty_long = &(Type){TY_LONG, 8, 8};
 Type *ty_int = &(Type){TY_INT, 4, 4};
 Type *ty_short = &(Type){TY_SHORT, 2, 2};
 Type *ty_char =&(Type){TY_CHAR, 1, 1};
+Type *ty_void =&(Type){TY_VOID, 1, 1};
 
 Type *new_type(TypeKind kind, int size, int align){
     Type *ty = calloc(1, sizeof(Type));
@@ -45,6 +46,10 @@ bool is_integer(Type *ty){
 
 bool is_ptr(Type *ty){
     return ty -> base != NULL;
+}
+
+bool is_void(Type *ty){
+    return ty -> kind == TY_VOID;
 }
 
 bool is_func(Type *ty){
@@ -114,6 +119,8 @@ void add_type(Node *node) {
         case ND_DEREF:
             if (!node-> rhs -> ty -> base) //pointer型でなけれなエラー
                 error("invalid pointer dereference");
+            if(node -> rhs -> ty -> base -> kind == TY_VOID)
+                error("dereferencing 'void *' pointer ");
             node -> ty = node -> rhs -> ty -> base;
             return;
        

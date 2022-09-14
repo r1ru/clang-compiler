@@ -413,7 +413,13 @@ static Node* stmt(void){
 }
 
 static bool is_typename(void){
-    return is_equal(token, "int") || is_equal(token, "char") || is_equal(token, "short") || is_equal(token, "long") || is_equal(token, "struct") || is_equal(token, "union");
+    static char* kw[] = {"int", "char", "short", "long", "void", "struct", "union"};
+    for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
+        if(is_equal(token, kw[i])){
+            return true;
+        }
+    }
+    return false;
 }
 
 /* compound-stmt = (declaration | stmt)* "}" */
@@ -547,6 +553,9 @@ static Type* delspec(void){
     }
     if(consume("short")){
         return ty_short;
+    }
+    if(consume("void")){
+        return ty_void;
     }
     if(consume("struct")){
         return struct_decl();
@@ -685,6 +694,10 @@ static Node *declaration(void){
     Node *cur = &head;
     while(!consume(";")){
         Type* ty = declarator(base);
+        /* declaratorの後にチェックするのはvoid *p;のようにvoidへのpointer型は合法なため。*/
+        if(is_void(ty)){
+            error_at(ty -> name -> str, "variable declared void");
+        }
         Obj *lvar = new_lvar(get_ident(ty -> name), ty);
 
         if(consume("=")){

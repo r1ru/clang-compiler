@@ -59,7 +59,8 @@ typedef enum{
     TY_FUNC,
     TY_ARRAY,
     TY_STRUCT,
-    TY_UNION
+    TY_UNION,
+    TY_VOID
 }TypeKind;
 
 typedef struct Type Type;
@@ -86,6 +87,7 @@ extern Type *ty_long;
 extern Type *ty_int;
 extern Type *ty_short;
 extern Type *ty_char;
+extern Type *ty_void;
 
 Type *new_type(TypeKind kind, int size, int align);
 Type* pointer_to(Type *base);
@@ -94,6 +96,7 @@ Type* func_type(Type *ret_ty);
 Type* copy_type(Type *ty);
 bool is_integer(Type *ty);
 bool is_ptr(Type* ty);
+bool is_void(Type *ty);
 bool is_func(Type *ty);
 bool is_array(Type *ty);
 bool is_struct(Type *ty);
