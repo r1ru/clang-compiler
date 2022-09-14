@@ -58,6 +58,10 @@ bool is_struct(Type *ty){
     return ty -> kind == TY_STRUCT;
 }
 
+bool is_union(Type *ty){
+    return ty -> kind == TY_UNION;
+}
+
 void add_type(Node *node) {
     /* 有効な値でないか、Nodeが既に型付けされている場合は何もしない。上書きを防ぐため。*/
     if (!node || node -> ty) 

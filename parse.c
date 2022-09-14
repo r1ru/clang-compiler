@@ -412,7 +412,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(void){
-    return is_equal(token, "int") || is_equal(token, "char") || is_equal(token, "struct");
+    return is_equal(token, "int") || is_equal(token, "char") || is_equal(token, "struct") || is_equal(token, "union");
 }
 
 /* compound-stmt = (declaration | stmt)* "}" */
@@ -470,24 +470,8 @@ static Member *struct_members(void){
     return head.next;
 } 
 
-/* 構造体のメンバにoffsetを適用して合計サイズを返す */
-static int assign_member_offsets(Type *ty){
-    int offset = 0;
-    for(Member *m = ty -> members; m; m = m -> next){
-        offset = align_to(offset, m -> ty -> align);
-        m -> offset = offset;
-        offset += m -> ty -> size;
-        /* 構造体のalignmentは最もaligmenが大きいメンバに合わせる。*/
-        if(ty -> align < m -> ty -> align){
-            ty -> align = m -> ty -> align;
-        }
-    }
-
-    return align_to(offset, ty -> align);
-}
-
-/* struct-decl = ident? "{" struct-members */
-static Type *struct_decl(void){
+/* struct-decl = ident? ("{" struct-members)? */
+static Type *struct_union_decl(void){
     Token *tag = NULL;
 
     /* 構造体tag */
@@ -499,17 +483,15 @@ static Type *struct_decl(void){
     /* タグ名で検索 */
     if(tag && !is_equal(token, "{")){
         Type *ty = find_tag(tag);
-        if(!tag){
+        if(!ty){
             error_at(tag -> str, "unknow struct type");
         }
         return ty;
     }
     expect("{");
     Type *ty = calloc(1, sizeof(Type));
-    ty -> kind = TY_STRUCT;
     ty -> members = struct_members();
     ty -> align = 1; 
-    ty -> size = assign_member_offsets(ty);
 
     /* tag名が指定されていた場合はリストに登録する */
     if(tag){
@@ -518,7 +500,40 @@ static Type *struct_decl(void){
     return ty;
 }
 
-/* delspec = "int" | "char" | struct-decl*/
+/* struct-decl = struct-union-decl */
+static Type *struct_decl(void){
+    Type *ty = struct_union_decl();
+    ty -> kind = TY_STRUCT;
+    int offset = 0;
+    for(Member *m = ty -> members; m; m = m -> next){
+        offset = align_to(offset, m -> ty -> align);
+        m -> offset = offset;
+        offset += m -> ty -> size;
+        /* 構造体のalignmentは最もaligmenが大きいメンバに合わせる。*/
+        if(ty -> align < m -> ty -> align){
+            ty -> align = m -> ty -> align;
+        }
+    }
+    ty -> size = align_to(offset, ty -> align);
+    return ty;
+}
+
+/* union-decl = struct-union-decl */
+static Type *union_decl(void){
+    Type *ty = struct_union_decl();
+    ty -> kind = TY_UNION;
+    for(Member *m = ty -> members; m; m = m -> next){
+        if(ty -> size < m -> ty -> size){
+            ty -> size = m -> ty -> size; // 共用体のサイズは最も大きいメンバに合わせる。
+        }
+        if(ty -> align < m -> ty -> align){
+            ty -> align = m -> ty -> align;
+        }
+    }
+    return ty;
+}
+
+/* delspec = "int" | "char" | struct-decl | union-decl */
 static Type* delspec(void){
     if(consume("int")){
         return ty_int;
@@ -528,6 +543,9 @@ static Type* delspec(void){
     }
     if(consume("struct")){
         return struct_decl();
+    }
+    if(consume("union")){
+        return union_decl();
     }
     error_at(token -> str, "unknown type");
 }
@@ -838,8 +856,8 @@ Member *get_struct_member(Type *ty, Token *name){
 
 static Node *struct_ref(Node *lhs, Token *name){
     add_type(lhs);
-    if(!is_struct(lhs -> ty)){
-        error_at(lhs -> ty -> name -> str, "not a struct");
+    if(!is_struct(lhs -> ty) && !is_union(lhs -> ty)){
+        error_at(lhs -> ty -> name -> str, "not a struct nor union");
     }
     Member *member = get_struct_member(lhs -> ty, name);
     Node *node = new_node(ND_MEMBER);

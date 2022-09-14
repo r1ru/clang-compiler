@@ -54,7 +54,8 @@ typedef enum{
     TY_PTR,
     TY_FUNC,
     TY_ARRAY,
-    TY_STRUCT
+    TY_STRUCT,
+    TY_UNION
 }TypeKind;
 
 typedef struct Type Type;
@@ -91,6 +92,7 @@ bool is_ptr(Type* ty);
 bool is_func(Type *ty);
 bool is_array(Type *ty);
 bool is_struct(Type *ty);
+bool is_union(Type *ty);
 void add_type(Node* np);
 
 /* parse.c */
