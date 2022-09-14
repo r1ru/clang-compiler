@@ -1,6 +1,6 @@
 #include "9cc.h"
 
-Type *ty_long = &(Type){TY_LONG, 8, 8};// 現状pointerの引き算の結果の型にしか使っていない。
+Type *ty_long = &(Type){TY_LONG, 8, 8};
 Type *ty_int = &(Type){TY_INT, 4, 4};
 Type *ty_char =&(Type){TY_CHAR, 1, 1};
 
@@ -39,7 +39,7 @@ Type* copy_type(Type *ty){
 }
 
 bool is_integer(Type *ty){
-    return ty -> kind == TY_INT || ty -> kind == TY_CHAR;
+    return ty -> kind == TY_INT || ty -> kind == TY_CHAR || ty -> kind == TY_LONG;
 }
 
 bool is_ptr(Type *ty){
@@ -100,7 +100,7 @@ void add_type(Node *node) {
         case ND_LE:
         case ND_NUM:
         case ND_FUNCCALL:
-            node -> ty = ty_int;
+            node -> ty = ty_long;
             return;
         case ND_VAR:
             node -> ty = node -> var -> ty;

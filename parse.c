@@ -190,7 +190,8 @@ static Node* postfix(void);
 static Node* primary(void);
 static Node* funcall(void);
 
-static int eval(Node *node, char **label){
+/* 引き算の結果負の値になる可能性があるのでint64_t */
+static int64_t eval(Node *node, char **label){
     add_type(node);
     switch(node -> kind){
         case ND_ADD:
@@ -229,7 +230,7 @@ static void gen_gvar_init(Obj *gvar, Node *init){
     InitData head = {};
     InitData *cur = &head;
     char *label = NULL;
-    int val;
+    int64_t val;
     for(Node *expr = init; expr; expr = expr -> next){
         cur = cur -> next = new_init_data();
         val = eval(expr, &label);
@@ -412,7 +413,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(void){
-    return is_equal(token, "int") || is_equal(token, "char") || is_equal(token, "struct") || is_equal(token, "union");
+    return is_equal(token, "int") || is_equal(token, "char") || is_equal(token, "long") || is_equal(token, "struct") || is_equal(token, "union");
 }
 
 /* compound-stmt = (declaration | stmt)* "}" */
@@ -540,6 +541,9 @@ static Type* delspec(void){
     }
     if(consume("char")){
         return ty_char;
+    }
+    if(consume("long")){
+        return ty_long;
     }
     if(consume("struct")){
         return struct_decl();

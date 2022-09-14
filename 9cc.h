@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
@@ -31,7 +32,7 @@ typedef enum{
 struct Token{
     Token* next;
     TokenKind kind;
-    int val;
+    uint64_t val;
     char* str;
     int len; // トークンの長さ
 };
@@ -44,6 +45,8 @@ bool at_eof(void);
 void next_token(void);
 bool is_equal(Token *tok, char *op);
 bool consume(char* op);
+void expect(char* op);
+uint64_t expect_number(void);
 void tokenize(char *path, char* p);
 
 /* type.c */
@@ -108,7 +111,7 @@ struct Member{
 typedef struct InitData InitData;
 struct InitData{
     InitData *next;
-    int val;
+    int64_t val;
     char *label;
 };
 
@@ -178,7 +181,7 @@ struct Node{
     Node* args; // argments;
 
     Node* body; // ND_BLOCK or ND_STMT_EXPR
-    int val; // ND_NUM用
+    uint64_t val; // ND_NUM用
     Obj* var; // ND_VAR用
 };
 

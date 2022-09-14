@@ -90,10 +90,10 @@ void expect(char* op){
 }
 
 /* TK_NUM用。トークンが数値の時にトークンを読み進めて数値を返す。それ以外の時エラー */
-int expect_number(void){
+uint64_t expect_number(void){
     if(token -> kind != TK_NUM)
         error_at(token -> str, "数ではありません\n");
-    int val = token -> val;
+    uint64_t val = token -> val;
     next_token();
     return val;
 }

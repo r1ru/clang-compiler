@@ -25,6 +25,10 @@ int subchar(char a, char b, char c) {
   return a - b - c;
 }
 
+int sublong(long a, long b, long c) {
+  return a - b - c;
+}
+
 int fib(int x) {
   if (x<=1)
     return 1;
@@ -44,6 +48,8 @@ int main() {
     ASSERT(55, fib(9));
 
     ASSERT(1, ({ subchar(7, 3, 3); }));
+
+    ASSERT(1, sublong(7, 3, 3));
 
     printf("OK\n");
     return 0;

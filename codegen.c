@@ -78,7 +78,7 @@ static void gen_addr(Node *np) {
 static void gen_expr(Node* np){
     switch(np -> kind){
         case ND_NUM:
-            fprintf(STREAM, "\tmov rax, %d\n", np -> val); /* ND_NUMなら入力が一つの数値だったということ。*/
+            fprintf(STREAM, "\tmov rax, %ld\n", np -> val); /* ND_NUMなら入力が一つの数値だったということ。*/
             return;
         
         case ND_VAR:
@@ -291,19 +291,19 @@ static void emit_data(Obj *globals){
         for(InitData *data = gvar -> init_data; data; data = data -> next){
             if(!data -> label){
                 if(base_size == 8){
-                    fprintf(STREAM, "\t.quad %d\n", data -> val);
+                    fprintf(STREAM, "\t.quad %ld\n", data -> val);
                 }else if(base_size == 4){
-                    fprintf(STREAM, "\t.long %d\n", data -> val);
+                    fprintf(STREAM, "\t.long %ld\n", data -> val);
                 }else{
-                    fprintf(STREAM, "\t.byte %d\n", data -> val);
+                    fprintf(STREAM, "\t.byte %ld\n", data -> val);
                 }
             }else{
                 if(base_size == 8){
-                    fprintf(STREAM, "\t.quad %s+%d\n", data -> label, data -> val);
+                    fprintf(STREAM, "\t.quad %s+%ld\n", data -> label, data -> val);
                 }else if(base_size == 4){
-                    fprintf(STREAM, "\t.long %s+%d\n", data -> label, data -> val);
+                    fprintf(STREAM, "\t.long %s+%ld\n", data -> label, data -> val);
                 }else{
-                    fprintf(STREAM, "\t.byte %s+%d\n", data -> label, data -> val);
+                    fprintf(STREAM, "\t.byte %s+%ld\n", data -> label, data -> val);
                 }
             }
             remain -= base_size;

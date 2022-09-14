@@ -41,6 +41,8 @@ int main() {
     ASSERT(2, ({ int x=2; { int x=3; } int y=4; x; }));
     ASSERT(3, ({ int x=2; { x=3; } x; }));
 
+    ASSERT(8, ({ long x; sizeof(x); }));
+
     printf("OK\n");
     return 0;
 }
