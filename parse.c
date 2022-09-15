@@ -99,9 +99,9 @@ static Type* find_tag(Token *tok){
 }
 
 /* 識別子がtypedfされた型だったら型を返す。それ以外はNULLを返す */
-static Type *find_typedef(){
-    if(token -> kind == TK_IDENT){
-        VarScope *sc = find_var(token);
+static Type *find_typedef(Token *tok){
+    if(tok -> kind == TK_IDENT){
+        VarScope *sc = find_var(tok);
         if(sc){
             return sc -> type_def; // typedefでない場合と、普通の変数の場合はどうなるのか。
         }
@@ -449,14 +449,14 @@ static Node* stmt(void){
     return np;
 }
 
-static bool is_typename(void){
+static bool is_typename(Token *tok){
     static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
-        if(is_equal(token, kw[i])){
+        if(is_equal(tok, kw[i])){
             return true;
         }
     }
-    return find_typedef();
+    return find_typedef(tok);
 }
 
 /* compound-stmt = (declaration | stmt)* "}" */
@@ -466,7 +466,7 @@ static Node* compound_stmt(void){
     Node *cur = &head;
     enter_scope();
     while(!consume("}")){
-        if(is_typename()){
+        if(is_typename(token)){
             VarAttr attr = {};
             Type *base = declspec(&attr);
             if(attr.is_typedef){
@@ -600,7 +600,7 @@ static Type* declspec(VarAttr *attr){
     Type *ty = ty_int; // typedef tのように既存の型が指定されていない場合、intになる。
 
     /* counterの値を調べているのはint main(){ typedef int t; {typedef long t;} }のように同名の型が来た時に二回目のtでfind_typedef()がtrueになってしまうから。*/
-    while(is_typename()){
+    while(is_typename(token)){
         if(consume("typedef")){
             if(!attr){
                 error_at(token -> str, "storage class specifier is not allowed in this context");
@@ -732,11 +732,13 @@ static Type* declarator(Type *ty){
     while(consume("*")){
         ty = pointer_to(ty);
     }
-    if(!is_ident()){
-        error_at(token -> str, "variable name expected\n");
+
+    Token *name = NULL;
+    // 関数の仮引数では識別子は省略できるため。
+    if(is_ident()){
+        name = token; 
+        next_token();   
     }
-    Token *name = token; //一時保存
-    next_token();
     ty = type_suffix(ty);
     ty -> name = name;
     return ty;
@@ -962,7 +964,7 @@ static Node* mul(void){
 }
 
 /* ("+" | "-")? unaryになっているのは - - xのように連続する可能性があるから。*/
-/* unary    = ("+" | "-" | "&" | "*" | "sizeof" )? unary
+/* unary    = ("+" | "-" | "&" | "*" )? unary
             | postfix */
 static Node* unary(void){
     Node* np;
@@ -979,11 +981,6 @@ static Node* unary(void){
     }
     if(consume("*")){
         return new_unary(ND_DEREF, unary());
-    }
-    if(consume("sizeof")){
-        np = unary();
-        add_type(np);
-        return new_num_node(np -> ty -> size);
     }
     return postfix();
 }
@@ -1035,12 +1032,14 @@ static Node* postfix(void){
     }
 }
 
-/* primary  = num
+/* primary  = "(" expr ")" 
+            | "(" "{" compound-stmt ")"
+            | funcall
             | ident
             | str
-            | funcall
-            | "(" expr ")" 
-            | "(" "{" compound-stmt ")" */
+            | "sizeof" typename
+            | "sizeof" unary 
+            | num */
 static Node* primary(void){
     Node* np;
 
@@ -1073,6 +1072,19 @@ static Node* primary(void){
         Obj * str = new_string_literal(token);
         next_token();
         return new_var_node(str);
+    }
+    if(consume("sizeof")){
+        if(is_equal(token, "(") && is_typename(token -> next)){
+            next_token(); // '('を読み飛ばす
+            Type *base = declspec(NULL);
+            Type *ty = declarator(base);
+            expect(")");
+            return new_num_node(ty -> size);
+        }else{
+            Node *node = unary();
+            add_type(node);
+            return new_num_node(node -> ty -> size);
+        }
     }
 
     /* そうでなければ数値のはず */
