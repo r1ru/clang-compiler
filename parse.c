@@ -589,7 +589,7 @@ static Type* func_params(Type *ret_ty){
 }
 
 /* type-suffix  = "(" func-params 
-                | "[" num "]"
+                | "[" num "]" type-suffix
                 | ε */ 
 static Type* type_suffix(Type *ty){
     if(consume("(")){
@@ -603,6 +603,7 @@ static Type* type_suffix(Type *ty){
             array_len = expect_number();
         }
         expect("]"); 
+        ty = type_suffix(ty);
         return array_of(ty, array_len);
     }
     return ty;
