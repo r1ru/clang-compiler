@@ -609,18 +609,33 @@ static Type* type_suffix(Type *ty){
     return ty;
 }
 
-/* declarator = "*"* ident type-suffix */
+/* char (*a) [2];を考える。*aを読んだ段階ではこれが何のポインタなのか分からない。()がある場合は外側を先に確定させる必要がある。この例だと一旦()を無視して、int [2]を読んでint型の配列(要素数2)が確定する。次に()の中を読むことでaの型がintの配列(要素数2)へのポインタ型だと分かる。*/
+
+/* declarator = ("*"* ident? | "(" declarator ")" ) type-suffix */
 static Type* declarator(Type *ty){
+    if(consume("(")){
+        Token *start = token;
+        Type dummy = {};
+        declarator(&dummy); // とりあえず読み飛ばす
+        expect(")");
+        ty = type_suffix(ty); // ()の外側の型を確定させる。
+        Token *end = token;
+        token  = start;
+        ty = declarator(ty); // ()の中の型を確定させる。
+        token = end;
+        return ty;
+    }
     while(consume("*")){
         ty = pointer_to(ty);
     }
-    if(token -> kind != TK_IDENT){
+    if(!is_ident()){
         error_at(token -> str, "variable name expected\n");
     }
     Token *name = token; //一時保存
     next_token();
     ty = type_suffix(ty);
     ty -> name = name;
+    return ty;
 }
 
 static Node *gen_lvar_init(Obj *lvar, Node* init){
