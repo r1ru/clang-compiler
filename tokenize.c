@@ -114,7 +114,7 @@ static bool startswith(char* p1, char* p2){
 
 /* keywordだった場合、keywordの長さを返す。それ以外の時0 */
 static int read_keyword(char* p){
-    static char* kw[] = {"return", "if", "else", "while", "for", "int", "sizeof", "char", "struct", "union", "long", "short", "void"};
+    static char* kw[] = {"return", "if", "else", "while", "for", "int", "sizeof", "char", "struct", "union", "long", "short", "void", "typedef"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(startswith(p, kw[i])){
             return strlen(kw[i]);

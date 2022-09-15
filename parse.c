@@ -98,6 +98,17 @@ static Type* find_tag(Token *tok){
     return NULL;
 }
 
+/* 識別子がtypedfされた型だったら型を返す。それ以外はNULLを返す */
+static Type *find_typedef(){
+    if(token -> kind == TK_IDENT){
+        VarScope *sc = find_var(token);
+        if(sc){
+            return sc -> type_def; // typedefでない場合と、普通の変数の場合はどうなるのか。
+        }
+    } 
+    return NULL;
+}
+
 /* 新しい変数を作成 */
 static Obj* new_var(char* name, Type* ty){
     Obj* var = calloc(1, sizeof(Obj));
@@ -174,14 +185,14 @@ static Node* new_var_node(Obj *var){
     return np;
 }
 
-static Type* declspec(void);
+static Type* declspec(VarAttr *attr);
 static Type* func_params(Type *ret_ty);
 static Type* type_suffix(Type *ty);
 static Type* declarator(Type *ty);
 static void function(Type *ty);
 static Node* stmt(void);
 static Node* compound_stmt(void);
-static Node* declaration(void);
+static Node* declaration(Type *base);
 static Node* expr(void);
 static Node* assign(void);
 static Node* equality(void);
@@ -298,11 +309,28 @@ static void gvar_initializer(Obj *gvar){
     gen_gvar_init(gvar, head.next);
 }
 
+/*  typedefは変数定義と同じくtypedef int x, *y;のように書ける。
+    chibiccにはtypedef int;のようなテストケースがあるが、役に立たないのでこういう入力は受け付けないことにする。*/
+static void parse_typedef(Type *base){
+    do{
+        Type *ty = declarator(base);
+        push_scope(get_ident(ty -> name)) -> type_def = ty;
+    }while(consume(","));
+    expect(";");
+}
+
 /* program = (function-definition | global-variable)* */
 Obj * parse(void){
     globals = NULL;
     while(!at_eof()){
-        Type *base = declspec();
+        VarAttr attr = {};
+        Type *base = declspec(&attr);
+
+        if(attr.is_typedef){
+            parse_typedef(base);
+            continue;
+        }
+
         Type *ty = declarator(base);
         if(is_func(ty)){
             function(ty);
@@ -422,13 +450,13 @@ static Node* stmt(void){
 }
 
 static bool is_typename(void){
-    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union"};
+    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(token, kw[i])){
             return true;
         }
     }
-    return false;
+    return find_typedef();
 }
 
 /* compound-stmt = (declaration | stmt)* "}" */
@@ -439,7 +467,13 @@ static Node* compound_stmt(void){
     enter_scope();
     while(!consume("}")){
         if(is_typename()){
-            cur = cur -> next = declaration();
+            VarAttr attr = {};
+            Type *base = declspec(&attr);
+            if(attr.is_typedef){
+                parse_typedef(base);
+                continue;
+            }
+            cur = cur -> next = declaration(base);
         }
         else{
             cur = cur -> next = stmt();
@@ -463,7 +497,7 @@ static Member *new_member(Token *name, Type *ty){
 static Member *decl(void){
     Member head = {};
     Member *cur = &head;
-    Type *base = declspec();
+    Type *base = declspec(NULL); // 構造体や共用体のメンバにtypedefはこれない
     do{
         Type *ty = declarator(base);
         cur = cur -> next = new_member(ty -> name, ty);
@@ -549,8 +583,11 @@ static Type *union_decl(void){
     return ty;
 }
 
-/*  declspec = ("void" | "char" | "short" | "int" | "long" | struct-decl | union-decl)+ */
-static Type* declspec(void){
+/*  declspec    = ("void" | "char" | "short" | "int" | "long" 
+                | struct-decl 
+                | union-decl 
+                | typedef-name )+ */
+static Type* declspec(VarAttr *attr){
     enum{
         VOID = 1 << 0,
         CHAR = 1 << 2,
@@ -560,9 +597,29 @@ static Type* declspec(void){
     };
 
     int counter = 0;
-    Type *ty;
+    Type *ty = ty_int; // typedef tのように既存の型が指定されていない場合、intになる。
 
+    /* counterの値を調べているのはint main(){ typedef int t; {typedef long t;} }のように同名の型が来た時に二回目のtでfind_typedef()がtrueになってしまうから。*/
     while(is_typename()){
+        if(consume("typedef")){
+            if(!attr){
+                error_at(token -> str, "storage class specifier is not allowed in this context");
+            }
+            attr -> is_typedef = true;
+            continue;
+        }
+        ty = find_typedef(token);
+        /* typedefされた型だった場合 */
+        if(ty && counter == 0){
+            next_token();
+            return ty;
+        }
+        /* 新しい型の宣言 */
+        if(ty && counter != 0){
+            break;
+        }
+
+
         if(consume("struct")){
             return struct_decl();
         }
@@ -625,7 +682,7 @@ static Type* func_params(Type *ret_ty){
     Type *func = func_type(ret_ty);
     if(!is_equal(token, ")")){
         do{
-            Type *base = declspec();
+            Type *base = declspec(NULL); // 仮引数にtypedefは来れない。
             Type *ty = declarator(base);
             cur = cur -> next = copy_type(ty); // copyしないと上書きされる可能性があるから。
         }while(consume(","));   
@@ -755,8 +812,7 @@ static Node *lvar_initializer(Obj *lvar){
 }
 
 /* declspec declarator ("=" expr)? ("," declarator ("=" expr)?)* ";" */
-static Node *declaration(void){
-    Type* base = declspec();
+static Node *declaration(Type *base){
     Node head = {};
     Node *cur = &head;
     while(!consume(";")){
