@@ -169,7 +169,7 @@ static Node* new_var_node(Obj *var){
     return np;
 }
 
-static Type* delspec(void);
+static Type* declspec(void);
 static Type* func_params(Type *ret_ty);
 static Type* type_suffix(Type *ty);
 static Type* declarator(Type *ty);
@@ -297,7 +297,7 @@ static void gvar_initializer(Obj *gvar){
 Obj * parse(void){
     globals = NULL;
     while(!at_eof()){
-        Type *base = delspec();
+        Type *base = declspec();
         Type *ty = declarator(base);
         if(is_func(ty)){
             function(ty);
@@ -458,7 +458,7 @@ static Member *new_member(Token *name, Type *ty){
 static Member *decl(void){
     Member head = {};
     Member *cur = &head;
-    Type *base = delspec();
+    Type *base = declspec();
     do{
         Type *ty = declarator(base);
         cur = cur -> next = new_member(ty -> name, ty);
@@ -544,8 +544,8 @@ static Type *union_decl(void){
     return ty;
 }
 
-/* delspec = "int" | "char" | struct-decl | union-decl */
-static Type* delspec(void){
+/* declspec = "int" | "char" | struct-decl | union-decl */
+static Type* declspec(void){
     if(consume("int")){
         return ty_int;
     }
@@ -578,7 +578,7 @@ static Type* func_params(Type *ret_ty){
     Type *func = func_type(ret_ty);
     if(!is_equal(token, ")")){
         do{
-            Type *base = delspec();
+            Type *base = declspec();
             Type *ty = declarator(base);
             cur = cur -> next = copy_type(ty); // copyしないと上書きされる可能性があるから。
         }while(consume(","));   
@@ -707,9 +707,9 @@ static Node *lvar_initializer(Obj *lvar){
     return gen_lvar_init(lvar, head.next);
 }
 
-/* delspec declarator ("=" expr)? ("," declarator ("=" expr)?)* ";" */
+/* declspec declarator ("=" expr)? ("," declarator ("=" expr)?)* ";" */
 static Node *declaration(void){
-    Type* base = delspec();
+    Type* base = declspec();
     Node head = {};
     Node *cur = &head;
     while(!consume(";")){
