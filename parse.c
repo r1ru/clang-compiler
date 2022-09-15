@@ -11,7 +11,12 @@ struct VarScope {
     VarScope *next;
     char *name;
     Obj *var;
+    Type *type_def;
 };
+
+typedef struct {
+    bool is_typedef;
+}VarAttr;
 
 typedef struct TagScope TagScope;
 struct TagScope{
@@ -40,13 +45,13 @@ static void leave_scope(void){
     scope = scope -> next;
 }
 
-/* 現在のScopeに変数を登録 */
-static void push_scope(char *name, Obj *var){
+/* 現在のScopeに名前を登録 */
+static VarScope *push_scope(char *name){
     VarScope *vsc = calloc(1, sizeof(VarScope));
     vsc -> name = name;
-    vsc -> var = var;
     vsc -> next = scope -> vars;
     scope -> vars = vsc;
+    return vsc;
 }
 
 /* 現在のScopeにstruct tagを登録 */
@@ -69,12 +74,12 @@ static char* get_ident(Token* tp){
     return strncpy(name, tp -> str, tp -> len);
 }
 
-/* 変数を名前で検索する。見つからなかった場合はNULLを返す。 */
-static Obj *find_var(Token* tok) {
+/* 名前で検索する。見つからなかった場合はNULLを返す。 */
+static VarScope *find_var(Token* tok) {
     for(Scope *sc = scope; sc; sc = sc -> next){
         for(VarScope *vsc = sc -> vars; vsc; vsc = vsc -> next){
             if(is_equal(tok, vsc -> name)){
-                return vsc -> var;
+                return vsc;
             }
         }
     }
@@ -98,7 +103,7 @@ static Obj* new_var(char* name, Type* ty){
     Obj* var = calloc(1, sizeof(Obj));
     var -> ty = ty;
     var -> name = name;
-    push_scope(name, var);
+    push_scope(name) -> var = var;
     return var;
 }
 
@@ -417,7 +422,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(void){
-    static char* kw[] = {"int", "char", "short", "long", "void", "struct", "union"};
+    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(token, kw[i])){
             return true;
@@ -544,30 +549,72 @@ static Type *union_decl(void){
     return ty;
 }
 
-/* declspec = "int" | "char" | struct-decl | union-decl */
+/*  declspec = ("void" | "char" | "short" | "int" | "long" | struct-decl | union-decl)+ */
 static Type* declspec(void){
-    if(consume("int")){
-        return ty_int;
+    enum{
+        VOID = 1 << 0,
+        CHAR = 1 << 2,
+        SHORT = 1 << 4,
+        INT = 1 << 6,
+        LONG = 1 << 8
+    };
+
+    int counter = 0;
+    Type *ty;
+
+    while(is_typename()){
+        if(consume("struct")){
+            return struct_decl();
+        }
+        if(consume("union")){
+            return union_decl();
+        }
+
+        if(consume("void")){
+            counter += VOID;
+        }
+        if(consume("char")){
+            counter += CHAR;
+        }
+        if(consume("short")){
+            counter += SHORT ;
+        }
+        if(consume("int")){
+            counter += INT ;
+        }
+        if(consume("long")){
+            counter += LONG;
+        }
+
+        switch(counter){
+            case VOID:
+                ty =  ty_void;
+                break;
+
+            case CHAR:
+                ty = ty_char;
+                break;
+
+            case SHORT:
+            case SHORT + INT:
+                ty = ty_short;
+                break;
+
+            case INT:
+                ty = ty_int;
+                break;
+            
+            case LONG:
+            case LONG + INT:
+            case LONG + LONG:
+                ty = ty_long;
+                break;
+            
+            default:
+                error_at(token -> str, "unknown type");
+        }
     }
-    if(consume("char")){
-        return ty_char;
-    }
-    if(consume("long")){
-        return ty_long;
-    }
-    if(consume("short")){
-        return ty_short;
-    }
-    if(consume("void")){
-        return ty_void;
-    }
-    if(consume("struct")){
-        return struct_decl();
-    }
-    if(consume("union")){
-        return union_decl();
-    }
-    error_at(token -> str, "unknown type");
+    return ty;
 }
 
 /* func-params = (param ("," param)*)? ")"
@@ -958,12 +1005,12 @@ static Node* primary(void){
         if(is_equal(token -> next, "(")){
             return funcall();
         }
-        Obj *var = find_var(token);
-        if(!var){
+        VarScope *vsc = find_var(token);
+        if(!vsc || !vsc -> var){
             error_at(token -> str, "undefined variable");
         }
         next_token();
-        return new_var_node(var);
+        return new_var_node(vsc -> var);
     }
 
     if(is_str()){
