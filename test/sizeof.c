@@ -19,6 +19,6 @@ int main() {
     ASSERT(48, sizeof(int[3][4]));
     ASSERT(8, sizeof(struct {int a; int b;}));
 
-  printf("OK\n");
-  return 0;
+    printf("OK\n");
+    return 0;
 }
