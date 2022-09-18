@@ -201,6 +201,7 @@ static Node* new_add(Node *lhs, Node *rhs);
 static Node* new_sub(Node *lhs, Node *rhs);
 static Node* add(void);
 static Node* mul(void);
+static Node *cast(void);
 static Node* unary(void);
 static Node* postfix(void);
 static Node* primary(void);
@@ -947,40 +948,56 @@ static Node* add(void){
     }
 }
 
-/* mul = unary ("*" unary | "/" unary)* */
+/* mul = cast ("*" cast | "/" cast)* */
 static Node* mul(void){
-    Node* np = unary();
+    Node* np = cast();
     for(;;){
         if(consume("*")){
-            np = new_binary(ND_MUL, np, unary());
+            np = new_binary(ND_MUL, np, cast());
             continue;
         }
         if(consume("/")){
-            np = new_binary(ND_DIV, np, unary());
+            np = new_binary(ND_DIV, np, cast());
             continue;
         }
         return np;
     }
 }
 
+/* cast = ( typename ) cast | unary */
+static Node *cast(void){
+    if(is_equal(token, "(") && is_typename(token -> next)){
+        consume("(");
+        Type *base = declspec(NULL);
+        Type *ty = declarator(base);
+        expect(")");
+        Node *node = new_node(ND_CAST);
+        node -> rhs = cast();
+        add_type(node -> rhs);
+        node -> ty = copy_type(ty);
+        return node;
+    }
+    return unary();
+}
+
 /* ("+" | "-")? unaryになっているのは - - xのように連続する可能性があるから。*/
-/* unary    = ("+" | "-" | "&" | "*" )? unary
+/* unary    = ("+" | "-" | "&" | "*" )? cast
             | postfix */
 static Node* unary(void){
     Node* np;
     /* +はそのまま */
     if(consume("+")){
-        return unary();
+        return cast();
     }
     /* -xは0 - xと解釈する。 */
     if(consume("-")){
-        return new_binary(ND_SUB, new_num_node(0), unary());
+        return new_binary(ND_SUB, new_num_node(0), cast());
     }
     if(consume("&")){
-        return new_unary(ND_ADDR, unary());
+        return new_unary(ND_ADDR, cast());
     }
     if(consume("*")){
-        return new_unary(ND_DEREF, unary());
+        return new_unary(ND_DEREF, cast());
     }
     return postfix();
 }

@@ -163,7 +163,8 @@ typedef enum{
     ND_FUNCCALL, // function call
     ND_ADDR, // unary &
     ND_DEREF, // unary *
-    ND_MEMBER // .
+    ND_MEMBER, // .
+    ND_CAST
 }NodeKind;
 
 struct Node{

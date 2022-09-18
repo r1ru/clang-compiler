@@ -97,6 +97,48 @@ static void gen_addr(Node *np) {
     error("代入の左辺値が変数ではありません");
 }
 
+enum { I8, I16, I32, I64};
+
+static int getTypeId(Type *ty){
+    switch(ty -> kind){
+        case TY_CHAR:
+            return I8;
+        
+        case TY_SHORT:
+            return I16;
+        
+        case TY_INT:
+            return I32;
+        
+    }
+    return I64; // ty_longとかpointer型とか。
+}
+
+static char i32i8[] = "movsx eax, al";
+static char i32i16[] = "movsx eax, ax";
+static char i32i64[] = "movsxd rax, eax";
+
+/*  cast to i8: alが有効
+    cast to i16: axが有効
+    cast ti i64: 現状fromがeaxかalなので普通にeaxをraxに拡張すればいい。*/ 
+static char *cast_table[][10] = {
+  {NULL,  NULL,   NULL, i32i64}, // i8
+  {i32i8, NULL,   NULL, i32i64}, // i16
+  {i32i8, i32i16, NULL, i32i64}, // i32
+  {i32i8, i32i16, NULL, NULL},   // i64
+};
+
+static void cast(Type *from, Type *to){
+    if(to -> kind == TY_VOID){
+        return; // voidへのキャストは無視
+    }
+    int t1 = getTypeId(from);
+    int t2 = getTypeId(to);
+    
+    if(cast_table[t1][t2])
+        fprintf(STREAM, "\t%s\n", cast_table[t1][t2]);
+}
+
 /* 式の評価結果はraxレジスタに格納される。 */
 static void gen_expr(Node* np){
     switch(np -> kind){
@@ -148,7 +190,11 @@ static void gen_expr(Node* np){
                 gen_stmt(stmt);
             }
             return;
-
+        
+        case ND_CAST:
+            gen_expr(np -> rhs);
+            cast(np -> rhs -> ty, np ->ty);
+            return;
     }
 
     /* 左辺と右辺を計算してスタックに保存 */
