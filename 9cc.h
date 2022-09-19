@@ -196,6 +196,7 @@ struct Node{
 extern Token *token;
 
 Obj* parse(void);
+Node *new_cast(Node *lhs, Type *ty);
 
 /* codegen.c */
 void codegen(Obj *program);

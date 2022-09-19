@@ -172,7 +172,7 @@ static Node* new_unary(NodeKind kind, Node *lhs){
 }
 
 /* ND_NUMを作成 */
-static Node* new_num_node(int val){
+static Node* new_num_node(uint64_t val){
     Node* np = new_node(ND_NUM);
     np -> val = val;
     return np;
@@ -227,6 +227,20 @@ static int64_t eval(Node *node, char **label){
             }
             *label = node -> lhs -> var -> name;
             return 0;
+        case ND_CAST:{
+            uint64_t val= eval(node -> lhs, label);
+            if(is_integer(node -> ty)){
+                switch(node -> ty -> size){
+                    case 1:
+                        return (uint8_t)val;
+                    case 2:
+                        return (uint16_t)val;
+                    case 4:
+                        return (uint32_t)val;
+                }
+            }
+            return val;
+        }
         case ND_VAR:
             if(node -> ty -> kind != TY_ARRAY){
                 error("not a compile-time constant");
@@ -891,6 +905,12 @@ static Node* relational(void){
     }
 }
 
+static Node *new_long(uint64_t val){
+    Node *node = new_num_node(val);
+    node -> ty = ty_long;
+    return node;
+}
+
 static Node* new_add(Node *lhs, Node *rhs){
     add_type(lhs);
     add_type(rhs);
@@ -906,7 +926,7 @@ static Node* new_add(Node *lhs, Node *rhs){
     }
     /* pointer + num は pointer + sizeof(type) * numに変更 */
     if(is_ptr(lhs -> ty) && is_integer(rhs -> ty)){
-        rhs = new_binary(ND_MUL, new_num_node(lhs -> ty -> base -> size), rhs);
+        rhs = new_binary(ND_MUL, new_long(lhs -> ty -> base -> size), rhs);
     }
     return new_binary(ND_ADD, lhs, rhs);
 }
@@ -922,11 +942,11 @@ static Node* new_sub(Node *lhs, Node *rhs){
     if(is_ptr(lhs -> ty) && is_ptr(rhs -> ty)){
         Node *node = new_binary(ND_SUB, lhs, rhs);
         node -> ty = ty_long; 
-        return new_binary(ND_DIV, node, new_num_node(lhs -> ty -> base -> size));
+        return new_binary(ND_DIV, node, new_long(lhs -> ty -> base -> size));
     }
     /* pointer - num は pointer - sizeof(type) * num */
     if(is_ptr(lhs -> ty) && is_integer(rhs -> ty)){
-        rhs = new_binary(ND_MUL, new_num_node(lhs -> ty -> base -> size), rhs);
+        rhs = new_binary(ND_MUL, new_long(lhs -> ty -> base -> size), rhs);
         add_type(rhs);
     }
     return new_binary(ND_SUB, lhs, rhs);
@@ -964,7 +984,7 @@ static Node* mul(void){
     }
 }
 
-static Node *new_cast(Node *lhs, Type *ty){
+Node *new_cast(Node *lhs, Type *ty){
     add_type(lhs); // from 
     Node *node = new_node(ND_CAST);
     node -> lhs = lhs;

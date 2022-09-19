@@ -68,6 +68,22 @@ bool is_union(Type *ty){
     return ty -> kind == TY_UNION;
 }
 
+static Type *get_common_type(Type *t1, Type *t2){
+    if(is_ptr(t1)){
+        return t1;
+    }
+    if(t1 -> size == 8 || t2 -> size == 8){
+        return ty_long;
+    }
+    return ty_int;
+}
+
+static void usual_arith_conv(Node **lhs, Node **rhs){
+    Type *ty = get_common_type((*lhs) -> ty, (*rhs) -> ty);
+    *lhs = new_cast(*lhs, ty);
+    *rhs = new_cast(*rhs, ty);
+}
+
 void add_type(Node *node) {
     /* 有効な値でないか、Nodeが既に型付けされている場合は何もしない。上書きを防ぐため。*/
     if (!node || node -> ty) 
@@ -93,19 +109,30 @@ void add_type(Node *node) {
     }
 
     switch (node -> kind) {
+        case ND_NUM:
+            node -> ty = node -> val == (int)node -> val ? ty_int : ty_long;
+            return;
         case ND_ADD:
         case ND_SUB:
         case ND_MUL:
         case ND_DIV:
-        case ND_ASSIGN:
-        case ND_NEG:
+            usual_arith_conv(&node -> lhs, &node -> rhs);
             node -> ty = node -> lhs -> ty;
             return;
+        case ND_NEG:{
+            Type *ty = get_common_type(ty_int, node -> lhs ->ty);
+            node -> lhs = new_cast(node -> lhs, ty);
+            node -> ty = ty;
+            return;
+        }
+
         case ND_EQ:
         case ND_NE:
         case ND_LT:
         case ND_LE:
-        case ND_NUM:
+            usual_arith_conv(&node -> lhs, &node ->rhs);
+            node -> ty = ty_int;
+            return;
         case ND_FUNCCALL:
             node -> ty = ty_long;
             return;
@@ -125,6 +152,14 @@ void add_type(Node *node) {
             node -> ty = node -> lhs -> ty -> base;
             return;
        
+        case ND_ASSIGN:
+            if(is_array(node -> lhs ->ty)){
+                error("not an lvalue");
+            }   
+            if(!is_struct(node -> lhs -> ty))
+                node -> rhs = new_cast(node -> rhs, node -> lhs -> ty);
+            node -> ty = node -> lhs -> ty;
+            return;
         case ND_STMT_EXPR:
             if(node -> body){
                 Node *stmt = node -> body;
