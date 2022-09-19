@@ -85,7 +85,7 @@ static void gen_addr(Node *np) {
                 return;
             }
         case ND_DEREF:
-            gen_expr(np -> rhs);
+            gen_expr(np -> lhs);
             return;
         
         /* x.aはxのアドレス + aのoffset */
@@ -153,7 +153,7 @@ static void gen_expr(Node* np){
             return;
         
         case ND_NEG:
-            gen_expr(np -> rhs);
+            gen_expr(np -> lhs);
             fprintf(STREAM, "\tneg rax\n");
             return;
 
@@ -182,11 +182,11 @@ static void gen_expr(Node* np){
         }
         
         case ND_ADDR:
-            gen_addr(np -> rhs);
+            gen_addr(np -> lhs);
             return;
         
         case ND_DEREF:
-            gen_expr(np -> rhs);
+            gen_expr(np -> lhs);
             load(np -> ty);
             return;
 
@@ -197,8 +197,8 @@ static void gen_expr(Node* np){
             return;
         
         case ND_CAST:
-            gen_expr(np -> rhs);
-            cast(np -> rhs -> ty, np ->ty);
+            gen_expr(np -> lhs);
+            cast(np -> lhs -> ty, np ->ty);
             return;
     }
 
@@ -252,7 +252,7 @@ static void gen_stmt(Node* np){
     switch(np -> kind){
     
         case ND_RET:
-            gen_expr(np -> rhs);
+            gen_expr(np -> lhs);
             fprintf(STREAM, "\tjmp .L.end.%s\n", current_fn -> name);
             return;
 
@@ -311,7 +311,7 @@ static void gen_stmt(Node* np){
             return;
 
         case ND_EXPR_STMT:
-            gen_expr(np -> rhs);
+            gen_expr(np -> lhs);
             return;   
     }
 }

@@ -98,10 +98,9 @@ void add_type(Node *node) {
         case ND_MUL:
         case ND_DIV:
         case ND_ASSIGN:
-            node -> ty = node ->lhs -> ty;
-            return;
         case ND_NEG:
-            node -> ty = node -> rhs -> ty; 
+            node -> ty = node -> lhs -> ty;
+            return;
         case ND_EQ:
         case ND_NE:
         case ND_LT:
@@ -114,16 +113,16 @@ void add_type(Node *node) {
             node -> ty = node -> var -> ty;
             return;
         case ND_ADDR:
-            if(node -> rhs -> ty -> kind == TY_ARRAY)
-                node->ty = pointer_to(node -> rhs -> ty -> base);
-            node ->ty = pointer_to(node -> rhs -> ty);
+            if(node -> lhs -> ty -> kind == TY_ARRAY)
+                node -> ty = pointer_to(node -> lhs -> ty -> base);
+            node -> ty = pointer_to(node -> lhs -> ty);
             return;
         case ND_DEREF:
-            if (!node-> rhs -> ty -> base) //pointer型でなけれなエラー
+            if (!node-> lhs -> ty -> base) //pointer型でなけれなエラー
                 error("invalid pointer dereference");
-            if(node -> rhs -> ty -> base -> kind == TY_VOID)
+            if(node -> lhs -> ty -> base -> kind == TY_VOID)
                 error("dereferencing 'void *' pointer ");
-            node -> ty = node -> rhs -> ty -> base;
+            node -> ty = node -> lhs -> ty -> base;
             return;
        
         case ND_STMT_EXPR:
@@ -135,7 +134,7 @@ void add_type(Node *node) {
                 if(stmt -> kind != ND_EXPR_STMT){
                     error("statement expression returning void is not supported"); // TODO: ここを改良
                 }
-                node -> ty = stmt -> rhs -> ty;
+                node -> ty = stmt -> lhs -> ty;
                 return;
             }
             

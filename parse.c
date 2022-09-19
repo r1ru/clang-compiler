@@ -165,10 +165,10 @@ static Node* new_binary(NodeKind kind, Node* lhs, Node* rhs){
 }
 
 /* 単項演算(unary operator)用 */
-static Node* new_unary(NodeKind kind, Node *rhs){
-    Node* np = new_node(kind);
-    np -> rhs = rhs;
-    return np;
+static Node* new_unary(NodeKind kind, Node *lhs){
+    Node* node = new_node(kind);
+    node -> lhs = lhs;
+    return node;
 }
 
 /* ND_NUMを作成 */
@@ -222,10 +222,10 @@ static int64_t eval(Node *node, char **label){
         case ND_NUM:
             return node -> val;
         case ND_ADDR:
-            if(!node -> rhs -> var -> is_global){
+            if(!node -> lhs -> var -> is_global){
                 error("not a compile-time constant");
             }
-            *label = node -> rhs -> var -> name;
+            *label = node -> lhs -> var -> name;
             return 0;
         case ND_VAR:
             if(node -> ty -> kind != TY_ARRAY){
@@ -396,7 +396,7 @@ static Node* stmt(void){
     /* "return" expr ";" */
     if(consume("return")){
         np = new_node(ND_RET);
-        np -> rhs = expr();
+        np -> lhs = expr();
         expect(";");
         return np;
     }
@@ -964,6 +964,14 @@ static Node* mul(void){
     }
 }
 
+static Node *new_cast(Node *lhs, Type *ty){
+    add_type(lhs); // from 
+    Node *node = new_node(ND_CAST);
+    node -> lhs = lhs;
+    node -> ty = copy_type(ty); // to
+    return node;
+}
+
 /* cast = ( typename ) cast | unary */
 static Node *cast(void){
     if(is_equal(token, "(") && is_typename(token -> next)){
@@ -971,11 +979,7 @@ static Node *cast(void){
         Type *base = declspec(NULL);
         Type *ty = declarator(base);
         expect(")");
-        Node *node = new_node(ND_CAST);
-        node -> rhs = cast();
-        add_type(node -> rhs);
-        node -> ty = copy_type(ty);
-        return node;
+        return new_cast(cast(), ty);
     }
     return unary();
 }
@@ -984,7 +988,6 @@ static Node *cast(void){
 /* unary    = ("+" | "-" | "&" | "*" )? cast
             | postfix */
 static Node* unary(void){
-    Node* np;
     /* +はそのまま */
     if(consume("+")){
         return cast();
