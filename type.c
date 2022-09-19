@@ -100,6 +100,8 @@ void add_type(Node *node) {
         case ND_ASSIGN:
             node -> ty = node ->lhs -> ty;
             return;
+        case ND_NEG:
+            node -> ty = node -> rhs -> ty; 
         case ND_EQ:
         case ND_NE:
         case ND_LT:

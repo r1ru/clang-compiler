@@ -151,6 +151,11 @@ static void gen_expr(Node* np){
             gen_addr(np);
             load(np -> ty);
             return;
+        
+        case ND_NEG:
+            gen_expr(np -> rhs);
+            fprintf(STREAM, "\tneg rax\n");
+            return;
 
         case ND_ASSIGN:
             gen_addr(np -> lhs);

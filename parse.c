@@ -989,9 +989,8 @@ static Node* unary(void){
     if(consume("+")){
         return cast();
     }
-    /* -xは0 - xと解釈する。 */
     if(consume("-")){
-        return new_binary(ND_SUB, new_num_node(0), cast());
+        return new_unary(ND_NEG, cast());
     }
     if(consume("&")){
         return new_unary(ND_ADDR, cast());
