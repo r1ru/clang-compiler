@@ -1144,18 +1144,29 @@ static Node* funcall(void){
         error_at(token -> str, "not a function");
     
     char *func_name = get_ident(token);
-    Type *ty = vsc -> var -> ty -> ret_ty;
+    Type *ty = vsc -> var -> ty;
+
     next_token();
 
     /* 引数のパース */
-    Node *cur = NULL;
+    Node head = {};
+    Node *cur = &head;
+    Type *param_ty = ty -> params;
     expect("(");
     /* 例えばf(1,2,3)の場合、リストは3->2->1のようにする。これはコード生成を簡単にするため。 */
     while(!consume(")")){
-        Node *param = expr();
-        add_type(param);
-        param -> next = cur;
-        cur = param;
+        Node *arg = expr();
+        add_type(arg);
+        /* int printf()のように、voidが子手入れされいない場合、任意の型を渡せる。*/
+        if(param_ty){
+            if(param_ty -> kind == TY_STRUCT || param_ty -> kind == TY_UNION){
+                error("passing struct or union is not supported yet");
+            }
+            arg = new_cast(arg, param_ty);
+            param_ty = param_ty -> next;
+        }
+
+        cur = cur -> next = arg;
         
         if(consume(","))
             continue;
@@ -1163,7 +1174,7 @@ static Node* funcall(void){
 
     Node* node = new_node(ND_FUNCCALL);
     node -> funcname = func_name;
-    node -> args = cur;
-    node -> ty = ty;
+    node -> args = head.next;
+    node -> ty = ty -> ret_ty;
     return node;   
 }

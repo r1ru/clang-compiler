@@ -120,7 +120,7 @@ static char i32i64[] = "movsxd rax, eax";
 
 /*  cast to i8: alが有効
     cast to i16: axが有効
-    cast ti i64: 現状fromがeaxかalなので普通にeaxをraxに拡張すればいい。*/ 
+    cast to i64: 現状fromがeaxかalなので普通にeaxをraxに拡張すればいい。*/ 
 static char *cast_table[][10] = {
   {NULL,  NULL,   NULL, i32i64}, // i8
   {i32i8, NULL,   NULL, i32i64}, // i16
@@ -173,7 +173,7 @@ static void gen_expr(Node* np){
                 push();
             }
             /* x86-64では先頭から6つの引数までをレジスタで渡す。 */
-            for(int i=0; i < nargs && i < 6; i++){
+            for(int i = nargs - 1;  0 <= i; i--){
                 pop(argreg64[i]);
             }
             fprintf(STREAM, "\tmov rax, 0\n"); // 浮動小数点の引数の個数
