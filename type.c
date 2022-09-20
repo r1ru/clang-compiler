@@ -133,6 +133,7 @@ void add_type(Node *node) {
             usual_arith_conv(&node -> lhs, &node ->rhs);
             node -> ty = ty_int;
             return;
+        /* parser側でtypeを追加しているのにこれを入れる必要はあるのか。*/
         case ND_FUNCCALL:
             node -> ty = ty_long;
             return;

@@ -5,6 +5,8 @@ Token *token;
 static Obj *locals;
 static Obj *globals;
 
+static Obj *current_fn; // 現在parseしている関数
+
 typedef struct VarScope VarScope;
 
 struct VarScope {
@@ -384,6 +386,7 @@ static void function(Type *ty){
     if(!func -> is_definition)
         return;
     
+    current_fn = func;
     locals = NULL;
     enter_scope(); //仮引数を関数のスコープに入れるため。
     create_param_lvars(ty -> params);
@@ -410,8 +413,10 @@ static Node* stmt(void){
     /* "return" expr ";" */
     if(consume("return")){
         np = new_node(ND_RET);
-        np -> lhs = expr();
+        Node *exp = expr();
+        add_type(exp);
         expect(";");
+        np -> lhs = new_cast(exp, current_fn -> ty -> ret_ty);
         return np;
     }
 

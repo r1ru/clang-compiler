@@ -112,15 +112,14 @@ static bool startswith(char* p1, char* p2){
     return strncmp(p1, p2, strlen(p2)) == 0;
 }
 
-/* keywordだった場合、keywordの長さを返す。それ以外の時0 */
-static int read_keyword(char* p){
+static bool is_keyword(Token *tok){
     static char* kw[] = {"return", "if", "else", "while", "for", "int", "sizeof", "char", "struct", "union", "long", "short", "void", "typedef"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
-        if(startswith(p, kw[i])){
-            return strlen(kw[i]);
+        if(is_equal(tok, kw[i])){
+            return true;
         }
     }
-    return 0;
+    return false;
 }
 
 /* 区切り文字だった場合長さを返す */
@@ -133,6 +132,15 @@ static int read_puct(char *p){
     }
     // +-*/()<>;={},&[].
     return ispunct(*p) ? 1 : 0;
+}
+
+/* int_to_charのような識別子を受け取れる様にするため、取り合えずTK_IDENTにしておいて後で種類を編集する */
+static void convert_keywords(Token *head){
+    for(Token *tok = head; tok -> kind != TK_EOF; tok = tok -> next){
+        if(is_keyword(tok)){
+            tok -> kind = TK_KEYWORD;
+        }
+    }
 }
 
 /* 入力文字列をトークナイズしてそれを返す */
@@ -193,15 +201,6 @@ void tokenize(char *path, char* p){
             continue;
         }
 
-        /* keywords */
-        int keyword_len = read_keyword(p);
-        if(keyword_len){
-            cur = cur -> next = new_token(TK_KEYWORD, p, p + keyword_len);
-            p += keyword_len;
-            continue;
-        }
-
-
         /* ローカル変数の場合(数字が使用される可能性もあることに注意。) */
         if(isalnum(*p) || *p == '_'){
             cur = cur -> next = new_token(TK_IDENT, p, p);
@@ -229,6 +228,10 @@ void tokenize(char *path, char* p){
     /* 終了を表すトークンを作成 */
     cur = cur -> next = new_token(TK_EOF, p, p);
 
+    convert_keywords(head.next);
+
     /* トークンの先頭へのポインタをセット */
     token = head.next;
 }
+
+
