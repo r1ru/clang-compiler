@@ -1132,22 +1132,33 @@ static Node* primary(void){
 
 /* funcall = ident "(" func-args? ")" */
 static Node* funcall(void){
-    Node* np = new_node(ND_FUNCCALL);
-    np -> funcname = get_ident(token);
+    VarScope *vsc = find_var(token);
+    if(!vsc)
+        error_at(token -> str, "implicit declaration of a function");
+    if (!vsc -> var || vsc -> var -> ty -> kind != TY_FUNC)
+        error_at(token -> str, "not a function");
+    
+    char *func_name = get_ident(token);
+    Type *ty = vsc -> var -> ty -> ret_ty;
     next_token();
 
+    /* 引数のパース */
+    Node *cur = NULL;
     expect("(");
-
     /* 例えばf(1,2,3)の場合、リストは3->2->1のようにする。これはコード生成を簡単にするため。 */
-    if(!is_equal(token, ")")){
-        Node *cur = expr();
-        while(consume(",")){
-            Node *param = expr();
-            param -> next = cur;
-            cur = param;
-        }
-        np -> args = cur;
+    while(!consume(")")){
+        Node *param = expr();
+        add_type(param);
+        param -> next = cur;
+        cur = param;
+        
+        if(consume(","))
+            continue;
     }
-    expect(")");
-    return np;   
+
+    Node* node = new_node(ND_FUNCCALL);
+    node -> funcname = func_name;
+    node -> args = cur;
+    node -> ty = ty;
+    return node;   
 }
