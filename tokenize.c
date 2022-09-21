@@ -143,6 +143,18 @@ static void convert_keywords(Token *head){
     }
 }
 
+static Token *read_char_literal(char *start){
+    char *p = start + 1;
+    char c = *p;
+    char *end = strchr(p, '\'');
+    if(!end){
+        error_at(start, "unclosed char literal\n");
+    }
+    Token *tok = new_token(TK_NUM, start, end + 1);
+    tok -> val = c;
+    return tok;
+}
+
 /* 入力文字列をトークナイズしてそれを返す */
 void tokenize(char *path, char* p){
     Token head; /* これは無駄になるがスタック領域なのでオーバーヘッドは0に等しい */
@@ -183,6 +195,12 @@ void tokenize(char *path, char* p){
             char *q = p;
             cur -> val = strtol(p, &p, 10);
             cur -> len = p - q; /* 長さを記録 */
+            continue;
+        }
+
+        if(*p == '\''){
+            cur = cur -> next = read_char_literal(p);
+            p += cur -> len;
             continue;
         }
 
