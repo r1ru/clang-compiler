@@ -470,7 +470,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(Token *tok){
-    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef"};
+    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(tok, kw[i])){
             return true;
@@ -513,7 +513,7 @@ static Member *new_member(Token *name, Type *ty){
 }
 
 
-/* decl = delsepc declarator ( "," declarator)* ";" */
+/* decl = declsepc declarator ( "," declarator)* ";" */
 static Member *decl(void){
     Member head = {};
     Member *cur = &head;
@@ -603,17 +603,18 @@ static Type *union_decl(void){
     return ty;
 }
 
-/*  declspec    = ("void" | "char" | "short" | "int" | "long" 
+/*  declspec    = ("void" | "char" | "short" | "int" | "long" | "_Bool"
                 | struct-decl 
                 | union-decl 
                 | typedef-name )+ */
 static Type* declspec(VarAttr *attr){
     enum{
-        VOID = 1 << 0,
-        CHAR = 1 << 2,
-        SHORT = 1 << 4,
-        INT = 1 << 6,
-        LONG = 1 << 8
+        BOOL = 1 << 0,
+        VOID = 1 << 2,
+        CHAR = 1 << 4,
+        SHORT = 1 << 6,
+        INT = 1 << 8,
+        LONG = 1 << 10
     };
 
     int counter = 0;
@@ -647,6 +648,10 @@ static Type* declspec(VarAttr *attr){
             return union_decl();
         }
 
+        if(consume("_Bool")){
+            counter += BOOL;
+        }
+
         if(consume("void")){
             counter += VOID;
         }
@@ -664,6 +669,10 @@ static Type* declspec(VarAttr *attr){
         }
 
         switch(counter){
+            case BOOL:
+                ty = ty_bool;
+                return;
+
             case VOID:
                 ty =  ty_void;
                 break;

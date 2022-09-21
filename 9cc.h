@@ -51,6 +51,7 @@ void tokenize(char *path, char* p);
 
 /* type.c */
 typedef enum{
+    TY_BOOL,
     TY_LONG,
     TY_INT,
     TY_SHORT,
@@ -88,6 +89,7 @@ extern Type *ty_int;
 extern Type *ty_short;
 extern Type *ty_char;
 extern Type *ty_void;
+extern Type *ty_bool;
 
 Type *new_type(TypeKind kind, int size, int align);
 Type* pointer_to(Type *base);

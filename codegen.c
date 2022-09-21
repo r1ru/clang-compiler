@@ -132,6 +132,12 @@ static void cast(Type *from, Type *to){
     if(to -> kind == TY_VOID){
         return; // voidへのキャストは無視
     }
+    if(to -> kind == TY_BOOL){
+        fprintf(STREAM, "\tcmp rax, 0\n");
+        fprintf(STREAM, "\tsetne al\n");
+        fprintf(STREAM, "\tmovzx eax, al\n");
+        return;
+    }
     int t1 = getTypeId(from);
     int t2 = getTypeId(to);
     
