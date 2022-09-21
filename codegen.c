@@ -373,9 +373,10 @@ static void emit_data(Obj *globals){
         fprintf(STREAM, "%s:\n", gvar -> name); 
         
         if(is_array(gvar -> ty) && gvar -> str){
-            fprintf(STREAM, "\t.ascii \"%s\"\n", gvar -> str);
-            remain -= strlen(gvar -> str);
-            goto end;
+            for(int i = 0; i < gvar -> ty -> array_len; i++){
+                fprintf(STREAM, "\t.byte %d\n", gvar -> str[i]);
+            }
+            continue;
         }
         
         /* 配列か普通の変数 */
@@ -399,9 +400,8 @@ static void emit_data(Obj *globals){
             }
             remain -= base_size;
         }
-        end:
-            if(remain != 0)
-                fprintf(STREAM, "\t.zero %d\n", remain);
+        if(remain != 0)
+            fprintf(STREAM, "\t.zero %d\n", remain);
     }
 }
 

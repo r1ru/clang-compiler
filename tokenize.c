@@ -143,10 +143,94 @@ static void convert_keywords(Token *head){
     }
 }
 
+/* 1桁の16進数を10進数に変換 */
+static int from_hex(char c){
+    if('0' <= c && c <= '9'){
+        return c - '0';
+    }
+    if('a' <= c && c <= 'f')
+        return c - 'a' + 10;
+    return c - 'A' - 10;
+}
+
+/* \nとかだけなら2byteだと分かるのだが、8進数や16進数だと長さが可変長になるので引数として入力ストリークへのポインタを渡す */
+static int read_escaped_char(char **pos, char *p){
+    /* ocatal escape sequence */
+    if('0' <= *p && *p <= '7'){
+        int c = *p - '0';
+        p++;
+        if('0' <= *p && *p <= '7'){
+            c = (c << 3) + *p - '0';
+            p++;
+            if('0' <= *p && *p <= '7'){
+                c = (c << 3) + *p - '0';
+                p++;
+            }
+        }
+        *pos = p;
+        return c;
+    }
+    /* hexademical escape sequence */
+    if(*p == 'x'){
+        p++;
+        if(!isxdigit(*p))
+            error_at(p, "invalid hex escape sequence\n");
+        int c = 0;
+        for(; isxdigit(*p); p++){
+            c = (c << 4) + from_hex(*p);
+        }
+        *pos = p;
+        return c;
+    }
+
+    *pos = p + 1;
+    switch(*p){
+        case 'a': return '\a'; // 警告音
+        case 'b': return '\b'; // バックスペース(カーソルを一つ前に戻す)
+        case 't': return '\t';
+        case 'n': return '\n';
+        case 'v': return '\v'; // VT(vertical tab)
+        case 'f': return '\f'; // FF('\v'との違いがよく分からん。)
+        case 'r': return '\r'; // CR(carriage return)
+        case 'e': return 27; // GNU拡張。使い道はよく分からん。
+        default: return *p;
+    }
+}
+
+static char *string_literal_end(char *p){
+    for(; *p != '"'; p++){
+        if(*p == '\\')
+            p++;
+    }
+    return p;
+}
+
+/* buf[len++]は代入した後インクリメントされる。*p++は参照した後にインクリメントされる。 */
+static Token *read_string_literal(char *start){
+    char *end = string_literal_end(start + 1);
+    char *buf = calloc(1, end - start); // ""の中の長さ+1
+    int len = 0;
+    for(char *p = start + 1; p < end;){
+        if(*p == '\\')
+            buf[len++] = read_escaped_char(&p, p + 1);
+        else
+            buf[len++] = *p++;
+    }
+    Token *tok = new_token(TK_STR, start, end + 1); // ""を含めた長さ(トークンの長さ)
+    tok -> str = buf; // bufに保存されるのは""の中のみ  
+    return tok;
+}
+
 static Token *read_char_literal(char *start){
     char *p = start + 1;
-    char c = *p;
-    char *end = strchr(p, '\'');
+
+    char c;
+    if(*p == '\\')
+        c = read_escaped_char(&p, p + 1);
+    else
+        c = *p++;
+
+    char *end = strchr(p, '\''); // 8進数として3桁以上指定されている可能性があるのでstrchrで無視する。
     if(!end){
         error_at(start, "unclosed char literal\n");
     }
@@ -206,16 +290,8 @@ void tokenize(char *path, char* p){
 
         /* 文字列リテラルの場合 */
         if(*p == '"'){
-            p++; // '"'を読み飛ばす
-            cur = cur -> next = new_token(TK_STR, p, p);
-            char *q = p;
-            for(; *p != '"'; p++){
-                if(*p == '\\'){
-                    p++; // '\'の次にある文字を飛ばす。(一字的な措置。)
-                }
-            }
-            cur -> len  = p - q;
-            p++; // '"'を読み飛ばす
+            cur = cur -> next = read_string_literal(p);
+            p += cur -> len;
             continue;
         }
 

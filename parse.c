@@ -145,9 +145,9 @@ static char* new_unique_name(void){
 }
 
 static Obj *new_string_literal(Token *tok){
-    Type *ty = array_of(ty_char, tok -> len + 1); // null文字があるので+1
+    Type *ty = array_of(ty_char, tok -> len - 1); // ""ぶんだけ引いてnull文字分+1
     Obj *strl = new_gvar(new_unique_name(), ty);
-    strl -> str = strndup(tok -> str, tok -> len);
+    strl -> str = tok -> str;
     return strl;
 }
 
