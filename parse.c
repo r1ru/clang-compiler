@@ -14,6 +14,8 @@ struct VarScope {
     char *name;
     Obj *var;
     Type *type_def;
+    Type *enum_ty;
+    int enum_val;
 };
 
 typedef struct {
@@ -71,9 +73,17 @@ static char* strndup(char* str, int len){
 }
 
 /* トークンの名前をバッファに格納してポインタを返す。strndupと同じ動作。 */
-static char* get_ident(Token* tp){
-    char* name = calloc(1, tp -> len + 1); // null終端するため。
-    return strncpy(name, tp -> str, tp -> len);
+static char* get_ident(Token* tok){
+    if(tok -> kind != TK_IDENT)
+        error_at(tok -> str, "expected an identifier\n");
+    char* name = calloc(1, tok -> len + 1); // null終端するため。
+    return strncpy(name, tok -> str, tok -> len);
+}
+
+static long get_number(Token *tok){
+    if(tok -> kind != TK_NUM)
+        error_at(tok -> str, "expected a number\n");
+    return tok -> val;
 }
 
 /* 名前で検索する。見つからなかった場合はNULLを返す。 */
@@ -470,7 +480,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(Token *tok){
-    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool"};
+    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(tok, kw[i])){
             return true;
@@ -513,7 +523,7 @@ static Member *new_member(Token *name, Type *ty){
 }
 
 
-/* decl = declsepc declarator ( "," declarator)* ";" */
+/* decl = declspec declarator ( "," declarator)* ";" */
 static Member *decl(void){
     Member head = {};
     Member *cur = &head;
@@ -603,10 +613,54 @@ static Type *union_decl(void){
     return ty;
 }
 
+/*  enum-specifier   = ident? "{" enum-list? "}"
+                    | ident
+    enum-list       = enumerator ("," enumerator)*
+    enumerator      = ident ( "=" constant-expression )? */
+static Type *enum_specifier(void){
+    Token *tag = NULL;
+    Type *ty = enum_type();
+
+    if(token -> kind == TK_IDENT){
+        tag = token;
+        next_token();
+    }
+
+    if(tag && !is_equal(token, "{")){
+        ty = find_tag(tag);
+        if(!ty)
+            error_at(token -> str, "unknown enum type\n");
+        if(ty -> kind != TY_ENUM)
+            error_at(token -> str, "not an enum type tag\n");
+        return ty;
+    }
+
+    expect("{");
+
+    int val = 0;
+    while(!consume("}")){
+        char *name = get_ident(token);
+        next_token();
+        if(consume("=")){
+            val = get_number(token);
+            next_token();
+        }
+        VarScope *vsc = push_scope(name);
+        vsc -> enum_ty = ty;
+        vsc -> enum_val = val++;
+        consume(",");
+    }
+
+    if(tag)
+        push_tag_scope(get_ident(tag), ty);
+    return ty;
+}
+
 /*  declspec    = ("void" | "char" | "short" | "int" | "long" | "_Bool"
                 | struct-decl 
                 | union-decl 
-                | typedef-name )+ */
+                | typedef-name
+                | enum-specifier )+ */
 static Type* declspec(VarAttr *attr){
     enum{
         BOOL = 1 << 0,
@@ -646,6 +700,9 @@ static Type* declspec(VarAttr *attr){
         }
         if(consume("union")){
             return union_decl();
+        }
+        if(consume("enum")){
+            return enum_specifier();
         }
 
         if(consume("_Bool")){
@@ -1114,11 +1171,14 @@ static Node* primary(void){
             return funcall();
         }
         VarScope *vsc = find_var(token);
-        if(!vsc || !vsc -> var){
+        if(!vsc || (!vsc -> var && !vsc -> enum_ty)){
             error_at(token -> str, "undefined variable");
         }
         next_token();
-        return new_var_node(vsc -> var);
+        if(vsc -> var)
+            return new_var_node(vsc -> var);
+        else
+            return new_num_node(vsc -> enum_val);
     }
 
     if(is_str()){

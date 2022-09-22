@@ -61,7 +61,8 @@ typedef enum{
     TY_ARRAY,
     TY_STRUCT,
     TY_UNION,
-    TY_VOID
+    TY_VOID,
+    TY_ENUM
 }TypeKind;
 
 typedef struct Type Type;
@@ -90,6 +91,7 @@ extern Type *ty_short;
 extern Type *ty_char;
 extern Type *ty_void;
 extern Type *ty_bool;
+Type *enum_type(void);
 
 Type *new_type(TypeKind kind, int size, int align);
 Type* pointer_to(Type *base);

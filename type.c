@@ -41,9 +41,13 @@ Type* copy_type(Type *ty){
     return ret;
 }
 
+Type *enum_type(void){
+    return new_type(TY_ENUM, 4, 4);
+}
+
 bool is_integer(Type *ty){
     TypeKind k = ty -> kind;
-    return k == TY_INT || k == TY_CHAR || k == TY_LONG || k == TY_SHORT || k == TY_BOOL;
+    return k == TY_INT || k == TY_CHAR || k == TY_LONG || k == TY_SHORT || k == TY_BOOL || k == TY_ENUM;
 }
 
 bool is_ptr(Type *ty){
