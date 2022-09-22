@@ -292,7 +292,7 @@ static void gen_stmt(Node* np){
         case ND_FOR:{
             int idx = get_index(); // インデックスを更新
             if(np -> init){
-                gen_expr(np -> init);
+                gen_stmt(np -> init);
             }
             fprintf(STREAM, ".L.begin.%u:\n", idx);
             if(np -> cond){

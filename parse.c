@@ -198,11 +198,13 @@ static Node* new_var_node(Obj *var){
     return np;
 }
 
+static bool is_typename(Token *tok);
 static Type* declspec(VarAttr *attr);
 static Type* func_params(Type *ret_ty);
 static Type* type_suffix(Type *ty);
 static Type* declarator(Type *ty);
 static void function(Type *ty, VarAttr *attr);
+static Node *expr_stmt(void);
 static Node* stmt(void);
 static Node* compound_stmt(void);
 static Node* declaration(Type *base);
@@ -409,6 +411,17 @@ static void function(Type *ty, VarAttr *attr){
     leave_scope();
 }
 
+/* expr-stmt = expr? ";" */
+static Node *expr_stmt(void){
+    if(consume(";")){
+        return new_node(ND_BLOCK); // null statement
+    }
+    Node *node = new_node(ND_EXPR_STMT);
+    node -> lhs = expr();
+    expect(";");
+    return node;
+}
+
 /* stmt = expr ";" 
         | "{" compound-stmt
         | "return" expr ";" 
@@ -457,12 +470,17 @@ static Node* stmt(void){
 
     /* "for" "(" expr? ";" expr? ";" expr? ")" stmt */
     if(consume("for")){
+        enter_scope();
         expect("(");
         np = new_node(ND_FOR);
         if(!is_equal(token, ";")){
-            np -> init = expr();
+            if(is_typename(token)){
+                Type *base = declspec(NULL);
+                np -> init = declaration(base);
+            }else{
+                np -> init = expr_stmt();
+            }
         }
-        expect(";");
         if(!is_equal(token, ";")){
             np -> cond = expr();
         }
@@ -472,13 +490,12 @@ static Node* stmt(void){
         }
         expect(")");
         np -> then = stmt();
+        leave_scope();
         return np;
     }
 
     /* expr ";" */
-    np = new_unary(ND_EXPR_STMT, expr());
-    expect(";");
-    return np;
+    return expr_stmt();
 }
 
 static bool is_typename(Token *tok){
