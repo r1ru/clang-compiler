@@ -412,8 +412,12 @@ static void emit_text(Obj *globals){
             continue;
         }
         current_fn = fn;
-        /* アセンブリの前半を出力 */
-        fprintf(STREAM, ".global %s\n", fn -> name);
+       
+        if(fn -> is_static)
+            fprintf(STREAM, ".local %s\n", fn -> name);
+        else
+            fprintf(STREAM, ".global %s\n", fn -> name);
+        
         fprintf(STREAM, "%s:\n", fn -> name);
 
         /* プロローグ。 */

@@ -20,6 +20,7 @@ struct VarScope {
 
 typedef struct {
     bool is_typedef;
+    bool is_static;
 }VarAttr;
 
 typedef struct TagScope TagScope;
@@ -201,7 +202,7 @@ static Type* declspec(VarAttr *attr);
 static Type* func_params(Type *ret_ty);
 static Type* type_suffix(Type *ty);
 static Type* declarator(Type *ty);
-static void function(Type *ty);
+static void function(Type *ty, VarAttr *attr);
 static Node* stmt(void);
 static Node* compound_stmt(void);
 static Node* declaration(Type *base);
@@ -360,7 +361,7 @@ Obj * parse(void){
 
         Type *ty = declarator(base);
         if(is_func(ty)){
-            function(ty);
+            function(ty, &attr);
         }
         else{
             Obj *gvar = new_gvar(get_ident(ty -> name), ty);
@@ -389,9 +390,10 @@ static void create_param_lvars(Type* param){
 }
 
 /* function = ";" | "{" compound_stmt */
-static void function(Type *ty){
+static void function(Type *ty, VarAttr *attr){
     Obj* func = new_gvar(get_ident(ty -> name), ty);
     func -> is_definition = !consume(";");
+    func -> is_static = attr -> is_static;
 
     if(!func -> is_definition)
         return;
@@ -480,7 +482,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(Token *tok){
-    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum"};
+    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum", "static"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(tok, kw[i])){
             return true;
@@ -676,13 +678,23 @@ static Type* declspec(VarAttr *attr){
 
     /* counterの値を調べているのはint main(){ typedef int t; {typedef long t;} }のように同名の型が来た時に二回目のtでfind_typedef()がtrueになってしまうから。*/
     while(is_typename(token)){
-        if(consume("typedef")){
+
+        /* handle strorage class specifiers */
+        if(is_equal(token, "typedef") || is_equal(token, "static")){
             if(!attr){
                 error_at(token -> str, "storage class specifier is not allowed in this context");
             }
-            attr -> is_typedef = true;
+            if(is_equal(token, "typedef"))
+                attr -> is_typedef = true;
+            else
+                attr -> is_static = true;
+
+            if(attr -> is_typedef + attr -> is_static > 1)
+                error_at(token -> str, "typedef and static may not be used together\n");
+            token = token -> next;
             continue;
         }
+
         ty = find_typedef(token);
         /* typedefされた型だった場合 */
         if(ty && counter == 0){
@@ -728,7 +740,7 @@ static Type* declspec(VarAttr *attr){
         switch(counter){
             case BOOL:
                 ty = ty_bool;
-                return;
+                break;
 
             case VOID:
                 ty =  ty_void;

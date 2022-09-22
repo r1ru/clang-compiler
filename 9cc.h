@@ -139,6 +139,7 @@ struct Obj{
 
     //function
     bool is_definition;
+    bool is_static;
     Obj *params;
     Obj *locals;
     Node *body;
