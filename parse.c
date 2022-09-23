@@ -960,12 +960,35 @@ static Node* expr(void){
     return node;
 }
 
-/* assign = equality ("=" assign)? */
+/* A op= Bを、tmp = &A, *tmp = *tmp op Bに変換する */
+static Node *to_assign(Node *binary){
+    add_type(binary -> lhs);
+    add_type(binary -> rhs);
+    Obj *var = new_lvar("", pointer_to(binary -> lhs -> ty));
+    Node *expr1 = new_binary(ND_ASSIGN, 
+                            new_var_node(var), 
+                            new_unary(ND_ADDR, binary -> lhs));
+    Node *expr2 = new_binary(ND_ASSIGN, 
+                            new_unary(ND_DEREF, new_var_node(var)), 
+                            new_binary(binary -> kind, new_unary(ND_DEREF, new_var_node(var)), binary -> rhs));
+    return new_binary(ND_COMMA, expr1, expr2);
+}
+
+/*  assign = equality (assing_op assign)?
+    assing-op = "=" | "+=" | "-=" | "*=" | "/=" */
 static Node* assign(void){
-    Node* np = equality();
+    Node* node = equality();
+    if(consume("+="))
+        node = to_assign(new_add(node, assign()));
+    if(consume("-="))
+        node = to_assign(new_sub(node, assign()));
+    if(consume("*="))
+        node = to_assign(new_binary(ND_MUL, node, assign()));
+    if(consume("/="))
+        node = to_assign(new_binary(ND_DIV, node, assign()));
     if(consume("="))
-        np = new_binary(ND_ASSIGN, np, assign()); // 代入は式。
-    return np;
+        node = new_binary(ND_ASSIGN, node, assign());
+    return node;
 }
 
 /* equality = relational ("==" relational | "!=" relational)* */

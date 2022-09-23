@@ -124,7 +124,7 @@ static bool is_keyword(Token *tok){
 
 /* 区切り文字だった場合長さを返す */
 static int read_puct(char *p){
-    static char* kw[] = {"==", "!=", "<=", ">=", "->"};
+    static char* kw[] = {"==", "!=", "<=", ">=", "->", "+=", "-=", "*=", "/="};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(startswith(p, kw[i])){
             return strlen(kw[i]);
