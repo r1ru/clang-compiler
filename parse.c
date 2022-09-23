@@ -185,7 +185,7 @@ static Node* new_unary(NodeKind kind, Node *lhs){
 }
 
 /* ND_NUMを作成 */
-static Node* new_num_node(uint64_t val){
+static Node* new_num_node(int64_t val){
     Node* np = new_node(ND_NUM);
     np -> val = val;
     return np;
@@ -1175,29 +1175,42 @@ static Node *struct_ref(Node *lhs, Token *name){
     return node;
 }
 
-/* postfix  = primary ("[" expr "]")?
-            | primary ("." ident | "->" ident)*  */
+/* A++を(typeof A)((A += 1) - 1)に変換する */
+static Node *new_inc_dec(Node *node, int64_t added){
+    add_type(node);
+    return new_cast(new_add(to_assign(new_add(node, new_num_node(added))), new_num_node(-added)), node -> ty);
+}
+
+/* postfix  = primary ("[" expr "]" | "." ident | "->" ident | "++" | "--")* */
 static Node* postfix(void){
-    Node *np = primary();
+    Node *node = primary();
     for(;;){
         if(consume("[")){
             Node *idx = expr();
-            np = new_unary(ND_DEREF, new_add(np, idx));
+            node = new_unary(ND_DEREF, new_add(node, idx));
             expect("]");
             continue;
         }
         if(consume(".")){
-            np = struct_ref(np, token);
+            node = struct_ref(node, token);
             next_token();
             continue;
         }
         if(consume("->")){
-            np = new_unary(ND_DEREF, np);
-            np = struct_ref(np, token);
+            node = new_unary(ND_DEREF, node);
+            node = struct_ref(node, token);
             next_token();
             continue;
         }
-        return np;
+        if(consume("++")){
+            node = new_inc_dec(node, 1);
+            continue;
+        }
+        if(consume("--")){
+            node = new_inc_dec(node, -1);
+            continue;
+        }
+        return node;
     }
 }
 

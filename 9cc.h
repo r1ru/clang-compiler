@@ -195,7 +195,7 @@ struct Node{
     Node* args; // argments;
 
     Node* body; // ND_BLOCK or ND_STMT_EXPR
-    uint64_t val; // ND_NUM用
+    int64_t val; // ND_NUM用
     Obj* var; // ND_VAR用
 };
 
