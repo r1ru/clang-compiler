@@ -93,6 +93,11 @@ static void gen_addr(Node *np) {
             gen_addr(np -> lhs);
             fprintf(STREAM, "\tadd rax, %d\n", np -> member -> offset);
             return;
+
+        case ND_COMMA:
+            gen_expr(np -> lhs);
+            gen_addr(np -> rhs);
+            return;
     }
     error("代入の左辺値が変数ではありません");
 }
@@ -205,6 +210,11 @@ static void gen_expr(Node* np){
         case ND_CAST:
             gen_expr(np -> lhs);
             cast(np -> lhs -> ty, np ->ty);
+            return;
+        
+        case ND_COMMA:
+            gen_expr(np -> lhs);
+            gen_expr(np -> rhs);
             return;
     }
 

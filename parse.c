@@ -314,7 +314,7 @@ static void gvar_initializer(Obj *gvar){
         if(consume("{")){
             int idx = 0;
             while(!consume("}")){
-                cur = cur -> next = expr();
+                cur = cur -> next = assign();
                 idx++;
 
                 if(is_equal(token, ",")){
@@ -334,7 +334,7 @@ static void gvar_initializer(Obj *gvar){
             error("invalid initializer"); // 配列の初期化式が不正
         }
     }else{
-        cur = cur -> next = expr();
+        cur = cur -> next = assign();
     }
     gen_gvar_init(gvar, head.next);
 }
@@ -898,7 +898,7 @@ static Node *lvar_initializer(Obj *lvar){
             next_token();
         }else if(consume("{")){
             while(!consume("}")){
-                cur = cur -> next = expr();
+                cur = cur -> next = assign();
                 idx++;
 
                 if(is_equal(token, ",")){
@@ -923,7 +923,7 @@ static Node *lvar_initializer(Obj *lvar){
             }
         }
     }else{
-        cur = cur -> next = expr();
+        cur = cur -> next = assign();
     }
     return gen_lvar_init(lvar, head.next);
 }
@@ -952,9 +952,12 @@ static Node *declaration(Type *base){
     return node;
 }
 
-/* expr = assign */
+/* expr = assign ("," expr)? */
 static Node* expr(void){
-    return assign();
+    Node *node = assign();
+    if(consume(","))
+        node = new_binary(ND_COMMA, node, expr());
+    return node;
 }
 
 /* assign = equality ("=" assign)? */
@@ -1253,7 +1256,7 @@ static Node* funcall(void){
     expect("(");
     /* 例えばf(1,2,3)の場合、リストは3->2->1のようにする。これはコード生成を簡単にするため。 */
     while(!consume(")")){
-        Node *arg = expr();
+        Node *arg = assign();
         add_type(arg);
         /* int printf()のように、voidが子手入れされいない場合、任意の型を渡せる。*/
         if(param_ty){

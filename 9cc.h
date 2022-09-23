@@ -170,7 +170,8 @@ typedef enum{
     ND_ADDR, // unary &
     ND_DEREF, // unary *
     ND_MEMBER, // .
-    ND_CAST
+    ND_CAST,
+    ND_COMMA // ,
 }NodeKind;
 
 struct Node{
