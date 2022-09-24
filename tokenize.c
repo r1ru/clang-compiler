@@ -239,6 +239,26 @@ static Token *read_char_literal(char *start){
     return tok;
 }
 
+static Token* read_int_literal(char *p){
+    char *start = p;
+    int base = 10; //default
+    if(!strncasecmp(p, "0x", 2) && isalnum(p[2])){
+        p += 2;
+        base = 16;
+    }else if(!strncasecmp(p, "0b", 2) && isalnum(p[2])){
+        p += 2;
+        base = 2;
+    }else if(*p == '0'){
+        base = 8;
+    }
+    int val = strtoul(p, &p, base);
+    if(isalnum(*p))
+        error_at(start, "invalid digit\n");
+    Token *tok = new_token(TK_NUM, start, p);
+    tok -> val = val;
+    return tok;
+}
+
 /* 入力文字列をトークナイズしてそれを返す */
 void tokenize(char *path, char* p){
     Token head; /* これは無駄になるがスタック領域なのでオーバーヘッドは0に等しい */
@@ -275,10 +295,8 @@ void tokenize(char *path, char* p){
 
         /* 数値だった場合 */
         if(isdigit(*p)){
-            cur = cur -> next = new_token(TK_NUM, p, p);
-            char *q = p;
-            cur -> val = strtol(p, &p, 10);
-            cur -> len = p - q; /* 長さを記録 */
+            cur = cur -> next = read_int_literal(p);
+            p += cur -> len;
             continue;
         }
 
