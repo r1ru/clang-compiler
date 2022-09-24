@@ -257,6 +257,18 @@ static void gen_expr(Node* node){
                 fprintf(STREAM, "\tmov rax, rdx\n");
             return;
 
+        case ND_BITOR:
+            fprintf(STREAM, "\tor rax, rdi\n");
+            return;
+        
+        case ND_BITXOR:
+            fprintf(STREAM, "\txor rax, rdi\n");
+            return;
+        
+        case ND_BITAND:
+            fprintf(STREAM, "\tand rax, rdi\n");
+            return;
+        
         case ND_EQ:
         case ND_NE:
         case ND_LT:

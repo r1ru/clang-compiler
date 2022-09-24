@@ -173,6 +173,9 @@ typedef enum{
     ND_DEREF, // unary *
     ND_NOT, // !
     ND_BITNOT, // ~
+    ND_BITOR, // |
+    ND_BITXOR, // ^
+    ND_BITAND, // &
     ND_MEMBER, // .
     ND_CAST,
     ND_COMMA // ,

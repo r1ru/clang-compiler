@@ -210,6 +210,9 @@ static Node* compound_stmt(void);
 static Node* declaration(Type *base);
 static Node* expr(void);
 static Node* assign(void);
+static Node *bitor(void);
+static Node *bitxor(void);
+static Node *bitand(void);
 static Node* equality(void);
 static Node * relational(void);
 static Node* new_add(Node *lhs, Node *rhs);
@@ -974,10 +977,10 @@ static Node *to_assign(Node *binary){
     return new_binary(ND_COMMA, expr1, expr2);
 }
 
-/*  assign = equality (assing_op assign)?
-    assing-op = "=" | "+=" | "-=" | "*=" | "/=" | "%=" */
+/*  assign = bitor (assing_op assign)?
+    assing-op = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "|=" |"^= | "&=" */
 static Node* assign(void){
-    Node* node = equality();
+    Node* node = bitor();
     if(consume("+="))
         node = to_assign(new_add(node, assign()));
     if(consume("-="))
@@ -988,8 +991,38 @@ static Node* assign(void){
         node = to_assign(new_binary(ND_DIV, node, assign()));
     if(consume("%="))
         node = to_assign(new_binary(ND_MOD, node, assign()));
+    if(consume("|="))
+        node = to_assign(new_binary(ND_BITOR, node, assign()));
+    if(consume("^="))
+        node = to_assign(new_binary(ND_BITXOR, node, assign()));
+    if(consume("&="))
+        node = to_assign(new_binary(ND_BITAND, node, assign()));
     if(consume("="))
         node = new_binary(ND_ASSIGN, node, assign());
+    return node;
+}
+
+/* bitor = bitxor ("|" bitxor )* */ 
+static Node *bitor(void){
+    Node *node = bitxor();
+    while(consume("|"))
+        node = new_binary(ND_BITOR, node, bitxor());
+    return node;
+}
+
+/* bitxor = bitand ("^" binand)* */
+static Node *bitxor(void){
+    Node *node = bitand();
+    while(consume("^"))
+        node = new_binary(ND_BITXOR, node, bitand());
+    return node;
+}
+
+/* bitand = equality ("&" equality)* */
+static Node *bitand(void){
+    Node *node = equality();
+    while(consume("&"))
+        node = new_binary(ND_BITAND, node, equality());
     return node;
 }
 
