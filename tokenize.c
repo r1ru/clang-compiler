@@ -130,7 +130,7 @@ static int read_puct(char *p){
             return strlen(kw[i]);
         }
     }
-    // +-*/()<>;={},&[].
+    // +-*/()<>;={},&[].!
     return ispunct(*p) ? 1 : 0;
 }
 

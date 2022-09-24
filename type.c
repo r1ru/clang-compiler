@@ -159,6 +159,10 @@ void add_type(Node *node) {
             node -> ty = node -> lhs -> ty -> base;
             return;
        
+        case ND_NOT:
+            node -> ty = ty_int;
+            return;
+        
         case ND_ASSIGN:
             if(is_array(node -> lhs ->ty)){
                 error("not an lvalue");

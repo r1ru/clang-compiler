@@ -170,6 +170,7 @@ typedef enum{
     ND_FUNCCALL, // function call
     ND_ADDR, // unary &
     ND_DEREF, // unary *
+    ND_NOT, // !
     ND_MEMBER, // .
     ND_CAST,
     ND_COMMA // ,

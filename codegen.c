@@ -201,6 +201,13 @@ static void gen_expr(Node* np){
             load(np -> ty);
             return;
 
+        case ND_NOT:
+            gen_expr(np -> lhs);
+            fprintf(STREAM, "\tcmp rax, 0\n");
+            fprintf(STREAM, "\tsete al\n");
+            fprintf(STREAM, "\tmovzx rax, al\n");
+            return;
+
         case ND_STMT_EXPR:
             for(Node *stmt = np -> body; stmt; stmt = stmt -> next){
                 gen_stmt(stmt);

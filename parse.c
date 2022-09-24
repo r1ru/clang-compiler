@@ -1131,7 +1131,7 @@ static Node *cast(void){
 }
 
 /* ("+" | "-")? unaryになっているのは - - xのように連続する可能性があるから。*/
-/* unary    = ("+" | "-" | "&" | "*" | "++" | "--")? cast
+/* unary    = ("+" | "-" | "&" | "*" | "++" | "--" | "!")? cast
             | postfix */
 static Node* unary(void){
     /* +はそのまま */
@@ -1147,6 +1147,8 @@ static Node* unary(void){
     if(consume("*")){
         return new_unary(ND_DEREF, cast());
     }
+    if(consume("!"))
+        return new_unary(ND_NOT, cast());
     if(consume("++"))
         return to_assign(new_add(cast(), new_num_node(1)));
     if(consume("--"))
