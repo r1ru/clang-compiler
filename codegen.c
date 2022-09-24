@@ -207,6 +207,11 @@ static void gen_expr(Node* np){
             fprintf(STREAM, "\tsete al\n");
             fprintf(STREAM, "\tmovzx rax, al\n");
             return;
+        
+        case ND_BITNOT:
+            gen_expr(np ->lhs);
+            fprintf(STREAM, "\tnot rax\n");
+            return;
 
         case ND_STMT_EXPR:
             for(Node *stmt = np -> body; stmt; stmt = stmt -> next){
