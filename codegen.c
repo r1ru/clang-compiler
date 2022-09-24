@@ -6,8 +6,8 @@ static char* argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
 static char* argreg16[] = {"di", "si", "dx", "cx", "r8w", "r9w"};
 static char* argreg8[] = {"dil", "sil", "dl", "cl", "r8b", "r9b" };
 
-static void gen_expr(Node* np);
-static void gen_stmt(Node* np);
+static void gen_expr(Node* node);
+static void gen_stmt(Node* node);
 
 static void push(void){
     fprintf(STREAM, "\tpush rax\n");
@@ -70,33 +70,33 @@ static void store(Type *ty){
     }
 }
 
-static void gen_expr(Node* np);
+static void gen_expr(Node* node);
 
 /* アドレスを計算してraxにセット */
-static void gen_addr(Node *np) {
-    switch(np -> kind){
+static void gen_addr(Node *node) {
+    switch(node -> kind){
         case ND_VAR:
-            if(np -> var -> is_global){
-                fprintf(STREAM, "\tlea rax, %s[rip]\n", np -> var -> name);
+            if(node -> var -> is_global){
+                fprintf(STREAM, "\tlea rax, %s[rip]\n", node -> var -> name);
                 return;
             }
             else{
-                fprintf(STREAM, "\tlea rax, [rbp -%d]\n", np -> var -> offset);
+                fprintf(STREAM, "\tlea rax, [rbp -%d]\n", node -> var -> offset);
                 return;
             }
         case ND_DEREF:
-            gen_expr(np -> lhs);
+            gen_expr(node -> lhs);
             return;
         
         /* x.aはxのアドレス + aのoffset */
         case ND_MEMBER:
-            gen_addr(np -> lhs);
-            fprintf(STREAM, "\tadd rax, %d\n", np -> member -> offset);
+            gen_addr(node -> lhs);
+            fprintf(STREAM, "\tadd rax, %d\n", node -> member -> offset);
             return;
 
         case ND_COMMA:
-            gen_expr(np -> lhs);
-            gen_addr(np -> rhs);
+            gen_expr(node -> lhs);
+            gen_addr(node -> rhs);
             return;
     }
     error("代入の左辺値が変数ではありません");
@@ -151,34 +151,34 @@ static void cast(Type *from, Type *to){
 }
 
 /* 式の評価結果はraxレジスタに格納される。 */
-static void gen_expr(Node* np){
-    switch(np -> kind){
+static void gen_expr(Node* node){
+    switch(node -> kind){
         case ND_NUM:
-            fprintf(STREAM, "\tmov rax, %ld\n", np -> val); /* ND_NUMなら入力が一つの数値だったということ。*/
+            fprintf(STREAM, "\tmov rax, %ld\n", node -> val); /* ND_NUMなら入力が一つの数値だったということ。*/
             return;
         
         case ND_VAR:
         case ND_MEMBER:
-            gen_addr(np);
-            load(np -> ty);
+            gen_addr(node);
+            load(node -> ty);
             return;
         
         case ND_NEG:
-            gen_expr(np -> lhs);
+            gen_expr(node -> lhs);
             fprintf(STREAM, "\tneg rax\n");
             return;
 
         case ND_ASSIGN:
-            gen_addr(np -> lhs);
+            gen_addr(node -> lhs);
             push();// pushしないと上書きされる可能性がある。
-            gen_expr(np -> rhs); // 右辺を計算。
-            store(np -> ty);
+            gen_expr(node -> rhs); // 右辺を計算。
+            store(node -> ty);
             return;
 
         case ND_FUNCCALL:{
             /* parser側でひと工夫しているので先頭からpushするだけで逆順になる。*/
             int nargs = 0;
-            for(Node *arg = np -> args; arg; arg = arg -> next){
+            for(Node *arg = node -> args; arg; arg = arg -> next){
                 gen_expr(arg);
                 nargs++;
                 push();
@@ -188,55 +188,55 @@ static void gen_expr(Node* np){
                 pop(argreg64[i]);
             }
             fprintf(STREAM, "\tmov rax, 0\n"); // 浮動小数点の引数の個数
-            fprintf(STREAM, "\tcall %s\n", np -> funcname);
+            fprintf(STREAM, "\tcall %s\n", node -> funcname);
             return;
         }
         
         case ND_ADDR:
-            gen_addr(np -> lhs);
+            gen_addr(node -> lhs);
             return;
         
         case ND_DEREF:
-            gen_expr(np -> lhs);
-            load(np -> ty);
+            gen_expr(node -> lhs);
+            load(node -> ty);
             return;
 
         case ND_NOT:
-            gen_expr(np -> lhs);
+            gen_expr(node -> lhs);
             fprintf(STREAM, "\tcmp rax, 0\n");
             fprintf(STREAM, "\tsete al\n");
             fprintf(STREAM, "\tmovzx rax, al\n");
             return;
         
         case ND_BITNOT:
-            gen_expr(np ->lhs);
+            gen_expr(node ->lhs);
             fprintf(STREAM, "\tnot rax\n");
             return;
 
         case ND_STMT_EXPR:
-            for(Node *stmt = np -> body; stmt; stmt = stmt -> next){
+            for(Node *stmt = node -> body; stmt; stmt = stmt -> next){
                 gen_stmt(stmt);
             }
             return;
         
         case ND_CAST:
-            gen_expr(np -> lhs);
-            cast(np -> lhs -> ty, np ->ty);
+            gen_expr(node -> lhs);
+            cast(node -> lhs -> ty, node ->ty);
             return;
         
         case ND_COMMA:
-            gen_expr(np -> lhs);
-            gen_expr(np -> rhs);
+            gen_expr(node -> lhs);
+            gen_expr(node -> rhs);
             return;
     }
 
     /* 左辺と右辺を計算してスタックに保存 */
-    gen_expr(np -> rhs);
+    gen_expr(node -> rhs);
     push();
-    gen_expr(np -> lhs);
+    gen_expr(node -> lhs);
     pop("rdi");
 
-    switch(np -> kind){
+    switch(node -> kind){
         case ND_ADD:
             fprintf(STREAM, "\tadd rax, rdi\n");
             return;
@@ -250,8 +250,11 @@ static void gen_expr(Node* np){
             return;
 
         case ND_DIV:
+        case ND_MOD:
             fprintf(STREAM, "\tcqo\n");
             fprintf(STREAM, "\tidiv rdi\n");
+            if(node -> kind == ND_MOD)
+                fprintf(STREAM, "\tmov rax, rdx\n");
             return;
 
         case ND_EQ:
@@ -259,16 +262,16 @@ static void gen_expr(Node* np){
         case ND_LT:
         case ND_LE:
             fprintf(STREAM, "\tcmp rax, rdi\n");
-        if(np -> kind == ND_EQ){
+        if(node -> kind == ND_EQ){
             fprintf(STREAM, "\tsete al\n");
         }
-        else if(np -> kind == ND_NE){
+        else if(node -> kind == ND_NE){
             fprintf(STREAM, "\tsetne al\n");
         }
-        else if(np -> kind == ND_LT){
+        else if(node -> kind == ND_LT){
             fprintf(STREAM, "\tsetl al\n");
         }
-        else if(np -> kind == ND_LE){
+        else if(node -> kind == ND_LE){
             fprintf(STREAM, "\tsetle al\n");
         }
         fprintf(STREAM, "\tmovzb rax, al\n");
@@ -276,24 +279,24 @@ static void gen_expr(Node* np){
     }    
 }
 
-static void gen_stmt(Node* np){
-    switch(np -> kind){
+static void gen_stmt(Node* node){
+    switch(node -> kind){
     
         case ND_RET:
-            gen_expr(np -> lhs);
+            gen_expr(node -> lhs);
             fprintf(STREAM, "\tjmp .L.end.%s\n", current_fn -> name);
             return;
 
         case ND_IF:{
             int idx = get_index();
-            gen_expr(np -> cond);
+            gen_expr(node -> cond);
             fprintf(STREAM, "\tcmp rax, 0\n");
             fprintf(STREAM, "\tje .L.else.%u\n", idx); // 条件式が偽の時はelseに指定されているコードに飛ぶ
-            gen_stmt(np -> then); // 条件式が真の時に実行される。
+            gen_stmt(node -> then); // 条件式が真の時に実行される。
             fprintf(STREAM, "\tjmp .L.end.%u\n", idx);
             fprintf(STREAM, ".L.else.%u:\n", idx);
-            if(np -> els){
-                gen_stmt(np -> els); // 条件式が偽の時に実行される。
+            if(node -> els){
+                gen_stmt(node -> els); // 条件式が偽の時に実行される。
             }
             fprintf(STREAM, ".L.end.%u:\n", idx);
             return;
@@ -302,10 +305,10 @@ static void gen_stmt(Node* np){
         case ND_WHILE:{
             int idx = get_index();
             fprintf(STREAM, ".L.begin.%u:\n", idx);
-            gen_expr(np -> cond);
+            gen_expr(node -> cond);
             fprintf(STREAM, "\tcmp rax, 0\n");
             fprintf(STREAM, "\tje .L.end.%u\n", idx); // 条件式が偽の時は終了
-            gen_stmt(np -> then); // 条件式が真の時に実行される。
+            gen_stmt(node -> then); // 条件式が真の時に実行される。
             fprintf(STREAM, "\tjmp .L.begin.%u\n", idx); // 条件式の評価に戻る
             fprintf(STREAM, ".L.end.%u:\n", idx);
             return;
@@ -313,19 +316,19 @@ static void gen_stmt(Node* np){
 
         case ND_FOR:{
             int idx = get_index(); // インデックスを更新
-            if(np -> init){
-                gen_stmt(np -> init);
+            if(node -> init){
+                gen_stmt(node -> init);
             }
             fprintf(STREAM, ".L.begin.%u:\n", idx);
-            if(np -> cond){
-                gen_expr(np -> cond);
+            if(node -> cond){
+                gen_expr(node -> cond);
                 fprintf(STREAM, "\tcmp rax, 0\n");
                 fprintf(STREAM, "\tje .L.end.%u\n", idx); // 条件式が偽の時は終了
 
             }
-            gen_stmt(np -> then); // thenは必ずあることが期待されている。
-            if(np -> inc){
-                gen_expr(np -> inc);
+            gen_stmt(node -> then); // thenは必ずあることが期待されている。
+            if(node -> inc){
+                gen_expr(node -> inc);
             }
             fprintf(STREAM, "\tjmp .L.begin.%u\n", idx); // 条件式の評価に戻る
             fprintf(STREAM, ".L.end.%u:\n", idx);
@@ -333,13 +336,13 @@ static void gen_stmt(Node* np){
         }
         
         case ND_BLOCK:
-            for(Node *stmt = np -> body; stmt; stmt = stmt -> next){
+            for(Node *stmt = node -> body; stmt; stmt = stmt -> next){
                 gen_stmt(stmt);
             }
             return;
 
         case ND_EXPR_STMT:
-            gen_expr(np -> lhs);
+            gen_expr(node -> lhs);
             return;   
     }
 }

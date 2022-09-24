@@ -975,7 +975,7 @@ static Node *to_assign(Node *binary){
 }
 
 /*  assign = equality (assing_op assign)?
-    assing-op = "=" | "+=" | "-=" | "*=" | "/=" */
+    assing-op = "=" | "+=" | "-=" | "*=" | "/=" | "%=" */
 static Node* assign(void){
     Node* node = equality();
     if(consume("+="))
@@ -986,6 +986,8 @@ static Node* assign(void){
         node = to_assign(new_binary(ND_MUL, node, assign()));
     if(consume("/="))
         node = to_assign(new_binary(ND_DIV, node, assign()));
+    if(consume("%="))
+        node = to_assign(new_binary(ND_MOD, node, assign()));
     if(consume("="))
         node = new_binary(ND_ASSIGN, node, assign());
     return node;
@@ -1094,19 +1096,23 @@ static Node* add(void){
     }
 }
 
-/* mul = cast ("*" cast | "/" cast)* */
+/* mul = cast ("*" cast | "/" cast | "%" cast)* */
 static Node* mul(void){
-    Node* np = cast();
+    Node* node = cast();
     for(;;){
         if(consume("*")){
-            np = new_binary(ND_MUL, np, cast());
+            node = new_binary(ND_MUL, node, cast());
             continue;
         }
         if(consume("/")){
-            np = new_binary(ND_DIV, np, cast());
+            node = new_binary(ND_DIV, node, cast());
             continue;
         }
-        return np;
+        if(consume("%")){
+            node = new_binary(ND_MOD, node, cast());
+            continue;
+        }
+        return node;
     }
 }
 
