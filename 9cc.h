@@ -176,6 +176,8 @@ typedef enum{
     ND_BITOR, // |
     ND_BITXOR, // ^
     ND_BITAND, // &
+    ND_LOGAND, // &&
+    ND_LOGOR, // ||
     ND_MEMBER, // .
     ND_CAST,
     ND_COMMA // ,

@@ -228,6 +228,38 @@ static void gen_expr(Node* node){
             gen_expr(node -> lhs);
             gen_expr(node -> rhs);
             return;
+
+        case ND_LOGOR:{
+            int idx = get_index();
+            gen_expr(node -> lhs);
+            fprintf(STREAM, "\tcmp rax, 0\n");
+            fprintf(STREAM, "\tjne .L.true.%d\n", idx);
+            gen_expr(node -> rhs);
+            fprintf(STREAM, "\tcmp rax, 0\n");
+            fprintf(STREAM, "\tjne .L.true.%d\n", idx);
+            fprintf(STREAM, "\tmov rax, 0\n");
+            fprintf(STREAM, "\tjmp .L.end.%d\n", idx);
+            fprintf(STREAM, ".L.true.%d:\n", idx);
+            fprintf(STREAM, "\tmov rax, 1\n");
+            fprintf(STREAM, ".L.end.%d:\n", idx);
+            return;
+        }
+        
+        case ND_LOGAND:{
+            int idx = get_index();
+            gen_expr(node -> lhs);
+            fprintf(STREAM, "\tcmp rax, 0\n");
+            fprintf(STREAM, "\tje .L.false.%d\n", idx);
+            gen_expr(node -> rhs);
+            fprintf(STREAM, "\tcmp rax, 0\n");
+            fprintf(STREAM, "\tje .L.false.%d\n", idx);
+            fprintf(STREAM, "\tmov rax, 1\n");
+            fprintf(STREAM, "\tjmp .L.end.%d\n", idx);
+            fprintf(STREAM, ".L.false.%d:\n", idx);
+            fprintf(STREAM, "\tmov rax, 0\n");
+            fprintf(STREAM, ".L.end.%d:\n", idx);
+            return;
+        }
     }
 
     /* 左辺と右辺を計算してスタックに保存 */

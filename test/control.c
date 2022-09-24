@@ -21,7 +21,16 @@ int main() {
     ASSERT(3, (1,2,3));
     ASSERT(5, ({ int i=2, j=3; (i=5,j)=6; i; }));
     ASSERT(6, ({ int i=2, j=3; (i=5,j)=6; j; }));
-    
+
+    ASSERT(1, 0||1);
+    ASSERT(1, 0||(2-2)||5);
+    ASSERT(0, 0||0);
+    ASSERT(0, 0||(2-2));
+
+    ASSERT(0, 0&&1);
+    ASSERT(0, (2-2)&&5);
+    ASSERT(1, 1&&5);
+        
     printf("OK\n");
     return 0;
 }
