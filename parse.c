@@ -455,29 +455,37 @@ static Member *struct_members(void){
 static Type *struct_union_decl(void){
     Token *tag = NULL;
 
-    /* 構造体tag */
     if(is_ident()){
         tag = token;
         next_token();
     }
 
-    /* タグ名で検索 */
     if(tag && !is_equal(token, "{")){
         Type *ty = find_tag(tag);
-        if(!ty){
-            error_at(tag -> str, "unknow struct type");
-        }
+        if(ty)
+            return ty;
+        ty = struct_type();
+        ty -> size = -1;
+        push_tag_scope(get_ident(tag), ty);
         return ty;
     }
+
     expect("{");
-    Type *ty = calloc(1, sizeof(Type));
+    Type *ty = struct_type();
     ty -> members = struct_members();
     ty -> align = 1; 
 
-    /* tag名が指定されていた場合はリストに登録する */
     if(tag){
+        /* 現在のスコープに同名のタグがある場合。不完全型なので上書き */
+        for(TagScope *tsc = scope -> tags; tsc; tsc = tsc -> next){
+            if(is_equal(tag, tsc -> name)){
+                *tsc -> ty = *ty; // 不完全型を修正
+                return tsc -> ty;
+            }
+        }
         push_tag_scope(get_ident(tag), ty);
     }
+
     return ty;
 }
 
@@ -485,6 +493,11 @@ static Type *struct_union_decl(void){
 static Type *struct_decl(void){
     Type *ty = struct_union_decl();
     ty -> kind = TY_STRUCT;
+
+    /* 不完全型なら何もしない */
+    if(ty -> size < 0)
+        return ty;
+    
     int offset = 0;
     for(Member *m = ty -> members; m; m = m -> next){
         offset = align_to(offset, m -> ty -> align);
@@ -503,6 +516,11 @@ static Type *struct_decl(void){
 static Type *union_decl(void){
     Type *ty = struct_union_decl();
     ty -> kind = TY_UNION;
+
+     /* 不完全型なら何もしない */
+    if(ty -> size < 0)
+        return ty;
+    
     for(Member *m = ty -> members; m; m = m -> next){
         if(ty -> size < m -> ty -> size){
             ty -> size = m -> ty -> size; // 共用体のサイズは最も大きいメンバに合わせる。

@@ -41,6 +41,10 @@ Type* copy_type(Type *ty){
     return ret;
 }
 
+Type *struct_type(void){
+    return new_type(TY_STRUCT, 0, 1);
+}
+
 Type *enum_type(void){
     return new_type(TY_ENUM, 4, 4);
 }

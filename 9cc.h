@@ -99,6 +99,7 @@ Type* pointer_to(Type *base);
 Type* array_of(Type *base, int len);
 Type* func_type(Type *ret_ty);
 Type* copy_type(Type *ty);
+Type *struct_type(void);
 bool is_integer(Type *ty);
 bool is_ptr(Type* ty);
 bool is_void(Type *ty);
