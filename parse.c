@@ -68,11 +68,6 @@ static void push_tag_scope(char *name, Type *ty){
     scope -> tags = tsc;
 }
 
-static char* strndup(char* str, int len){
-    char *s = calloc(1, len + 1);
-    return strncpy(s, str, len);
-}
-
 /* トークンの名前をバッファに格納してポインタを返す。strndupと同じ動作。 */
 static char* get_ident(Token* tok){
     if(tok -> kind != TK_IDENT)
@@ -227,123 +222,6 @@ static Node* postfix(void);
 static Node* primary(void);
 static Node* funcall(void);
 
-/* 引き算の結果負の値になる可能性があるのでint64_t */
-static int64_t eval(Node *node, char **label){
-    add_type(node);
-    switch(node -> kind){
-        case ND_ADD:
-            return eval(node -> lhs, label) + eval(node -> rhs, label);
-        case ND_SUB:
-            return eval(node -> lhs, label) - eval(node -> rhs, label);
-        case ND_MUL:
-            return eval(node -> lhs, label) * eval(node -> rhs, label);
-        case ND_DIV:
-            return eval(node -> lhs, label) + eval(node -> rhs, label);
-        case ND_NUM:
-            return node -> val;
-        case ND_ADDR:
-            if(!node -> lhs -> var -> is_global){
-                error("not a compile-time constant");
-            }
-            *label = node -> lhs -> var -> name;
-            return 0;
-        case ND_CAST:{
-            uint64_t val= eval(node -> lhs, label);
-            if(is_integer(node -> ty)){
-                switch(node -> ty -> size){
-                    case 1:
-                        return (uint8_t)val;
-                    case 2:
-                        return (uint16_t)val;
-                    case 4:
-                        return (uint32_t)val;
-                }
-            }
-            return val;
-        }
-        case ND_VAR:
-            if(node -> ty -> kind != TY_ARRAY){
-                error("not a compile-time constant");
-            }
-            *label = node -> var -> name;
-            return 0;
-    }
-    error("initializer element is not constant");
-}
-
-static InitData* new_init_data(void){
-    InitData *data = calloc(1, sizeof(InitData));
-    return data;
-}
-
-static void gen_gvar_init(Obj *gvar, Node *init){
-    /* 初期化式の評価結果の単方向リスト */
-    InitData head = {};
-    InitData *cur = &head;
-    char *label = NULL;
-    int64_t val;
-    for(Node *expr = init; expr; expr = expr -> next){
-        cur = cur -> next = new_init_data();
-        val = eval(expr, &label);
-        if(label){
-            cur -> label = label;
-        }
-        cur -> val = val;
-    }
-    gvar -> init_data = head.next;
-}
-
-static void skip_excess_elements(void){
-    while(!is_equal(token, "}")){
-        next_token();
-    }
-}
-
-static void gvar_initializer(Obj *gvar){
-    /* 初期式の単方向リスト */
-    Node head = {};
-    Node *cur = &head;
-    if(is_array(gvar -> ty)){
-        if(is_str()){
-            if(gvar -> ty -> array_len == 0){
-                gvar -> ty -> array_len = gvar -> ty -> size = token -> len + 1; // NULL文字分+1
-            }
-            if(gvar -> ty -> array_len < token -> len){
-                gvar -> str = strndup(token -> str, gvar -> ty -> array_len);
-            }else{
-                gvar -> str = strndup(token -> str, token -> len);
-            }
-            next_token();
-            return;
-        }
-        if(consume("{")){
-            int idx = 0;
-            while(!consume("}")){
-                cur = cur -> next = assign();
-                idx++;
-
-                if(is_equal(token, ",")){
-                    next_token();
-                }
-                if(gvar -> ty -> array_len == idx){
-                    skip_excess_elements();
-                }
-            }
-            /* 要素数が指定されていない場合サイズを修正する。*/
-            if(gvar -> ty -> array_len == 0){
-                gvar -> ty -> array_len = idx;
-                gvar -> ty -> size = gvar -> ty -> base -> size * idx;
-            }
-        }
-        else{
-            error("invalid initializer"); // 配列の初期化式が不正
-        }
-    }else{
-        cur = cur -> next = assign();
-    }
-    gen_gvar_init(gvar, head.next);
-}
-
 /*  typedefは変数定義と同じくtypedef int x, *y;のように書ける。
     chibiccにはtypedef int;のようなテストケースがあるが、役に立たないのでこういう入力は受け付けないことにする。*/
 static void parse_typedef(Type *base){
@@ -371,16 +249,13 @@ Obj * parse(void){
             function(ty, &attr);
         }
         else{
-            Obj *gvar = new_gvar(get_ident(ty -> name), ty);
+            new_gvar(get_ident(ty -> name), ty);
             while(!is_equal(token, ";")){
-                if(consume("=")){
-                    gvar_initializer(gvar);
-                }
                 if(!consume(",")){
                     break;
                 }
                 ty = declarator(base);
-                gvar = new_gvar(get_ident(ty -> name), ty);
+                new_gvar(get_ident(ty -> name), ty);
             }
             expect(";");
         }
@@ -864,76 +739,7 @@ static Type* declarator(Type *ty){
     return ty;
 }
 
-static Node *gen_lvar_init(Obj *lvar, Node* init){
-    /* 初期化式の単方向リスト */
-    Node head = {};
-    Node *cur = &head;
-    if(is_array((lvar -> ty))){
-        int idx = 0;
-        for(Node *rhs = init; rhs; rhs = rhs -> next){
-            Node *lhs =  new_unary(ND_DEREF, new_add(new_var_node(lvar), new_num_node(idx)));
-            Node *node = new_binary(ND_ASSIGN, lhs, rhs);
-            cur = cur -> next = new_unary(ND_EXPR_STMT, node);
-            idx++;
-            if(idx == lvar -> ty -> array_len){
-                break;
-            }
-        }
-    }else{
-        Node *node = new_binary(ND_ASSIGN, new_var_node(lvar), init); 
-        cur = cur -> next = new_unary(ND_EXPR_STMT, node);
-    }
-    return head.next;
-}
-
-static Node *lvar_initializer(Obj *lvar){
-    /* 初期化式の右辺の単方向リスト */
-    Node head = {};
-    Node *cur = &head;
-
-    if(is_array(lvar -> ty)){
-        int idx = 0;
-        if(is_str()){
-            if(lvar -> ty -> array_len == 0){
-                lvar -> ty -> array_len = token ->len + 1;
-            }
-            for(idx = 0; idx < token -> len && idx < lvar -> ty -> array_len; idx++){
-                cur = cur -> next = new_num_node(token -> str[idx]); 
-            }
-            next_token();
-        }else if(consume("{")){
-            while(!consume("}")){
-                cur = cur -> next = assign();
-                idx++;
-
-                if(is_equal(token, ",")){
-                    next_token();
-                }
-                if(lvar -> ty -> array_len == idx){
-                    skip_excess_elements();
-                }
-            }
-            /* 要素数が指定されていない場合サイズを修正する。*/
-            if(lvar -> ty -> array_len == 0){
-                lvar -> ty -> array_len = idx;
-                lvar -> ty -> size = lvar -> ty -> base -> size * idx;
-            }
-        }else{
-            error("invalid initializer"); // 配列の初期化式が不正
-        }
-        /* 初期か式の数が要素数よりも少ないときは、残りを0クリア。*/
-        if(idx < lvar -> ty -> array_len){
-            for(;idx != lvar -> ty -> array_len; idx++){
-                cur = cur -> next = new_num_node(0);
-            }
-        }
-    }else{
-        cur = cur -> next = assign();
-    }
-    return gen_lvar_init(lvar, head.next);
-}
-
-/* declspec declarator ("=" expr)? ("," declarator ("=" expr)?)* ";" */
+/* declspec declarator ("=" assign)? ("," declarator ("=" assign)?)* ";" */
 static Node *declaration(Type *base){
     Node head = {};
     Node *cur = &head;
@@ -944,10 +750,14 @@ static Node *declaration(Type *base){
             error_at(ty -> name -> str, "variable declared void");
         }
         Obj *lvar = new_lvar(get_ident(ty -> name), ty);
-
+        
         if(consume("=")){
-           cur = cur -> next = lvar_initializer(lvar);
+            Node *lhs = new_var_node(lvar);
+            Node *rhs = assign();
+            Node *node = new_binary(ND_ASSIGN, lhs, rhs);
+            cur = cur -> next  = new_unary(ND_EXPR_STMT, node);
         }
+
         if(consume(",")){
             continue;
         }
