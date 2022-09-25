@@ -676,14 +676,21 @@ static Type* declspec(VarAttr *attr){
 static Type* func_params(Type *ret_ty){
     Type head = {};
     Type *cur = &head;
-    Type *func = func_type(ret_ty);
     if(!is_equal(token, ")")){
         do{
-            Type *base = declspec(NULL); // 仮引数にtypedefは来れない。
-            Type *ty = declarator(base);
+            Type *ty = declspec(NULL); // 仮引数にtypedefは来れない。
+            ty = declarator(ty);
+
+            /* array of T を pointer to T に変換する */
+            if(ty -> kind == TY_ARRAY){
+                Token *name = ty -> name;
+                ty = pointer_to(ty -> base);
+                ty -> name = name;
+            }
             cur = cur -> next = copy_type(ty); // copyしないと上書きされる可能性があるから。
         }while(consume(","));   
     }
+    Type *func = func_type(ret_ty);
     func -> params = head.next;
     expect(")");
     return func;
