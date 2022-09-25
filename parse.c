@@ -197,7 +197,9 @@ static bool is_typename(Token *tok);
 static Type* declspec(VarAttr *attr);
 static Type* func_params(Type *ret_ty);
 static Type* type_suffix(Type *ty);
+static Type *array_dementions(Type *ty);
 static Type* declarator(Type *ty);
+static Type *abstract_declarator(Type *ty);
 static void function(Type *ty, VarAttr *attr);
 static Node *expr_stmt(void);
 static Node* stmt(void);
@@ -688,30 +690,36 @@ static Type* func_params(Type *ret_ty){
 }
 
 /* type-suffix  = "(" func-params 
-                | "[" num "]" type-suffix
+                | "[" array-dementions
                 | ε */ 
 static Type* type_suffix(Type *ty){
     if(consume("(")){
         return func_params(ty);
     }
-    if(consume("[")){
-        int array_len;
-        if(is_equal(token, "]")){
-            array_len = 0; // 要素数が指定されていない場合
-        }else{
-            array_len = expect_number();
-        }
-        expect("]"); 
-        ty = type_suffix(ty);
-        return array_of(ty, array_len);
-    }
+    if(consume("["))
+        return array_dementions(ty);
     return ty;
+}
+
+/* array-dementions = num? "}" type-suffix */
+static Type *array_dementions(Type *ty){
+    if(consume("]")){
+        ty = type_suffix(ty);
+        return array_of(ty, -1);
+    }
+    int siz = expect_number();
+    expect("]");
+    ty = type_suffix(ty);
+    return array_of(ty , siz);
 }
 
 /* char (*a) [2];を考える。*aを読んだ段階ではこれが何のポインタなのか分からない。()がある場合は外側を先に確定させる必要がある。この例だと一旦()を無視して、int [2]を読んでint型の配列(要素数2)が確定する。次に()の中を読むことでaの型がintの配列(要素数2)へのポインタ型だと分かる。*/
 
-/* declarator = ("*"* ident? | "(" declarator ")" ) type-suffix */
+/* declarator = "*"*  (ident | "(" ident ")" | "(" declarator ")" ) type-suffix */
 static Type* declarator(Type *ty){
+    while(consume("*"))
+        ty = pointer_to(ty);
+
     if(consume("(")){
         Token *start = token;
         Type dummy = {};
@@ -724,19 +732,42 @@ static Type* declarator(Type *ty){
         token = end;
         return ty;
     }
-    while(consume("*")){
-        ty = pointer_to(ty);
+
+    if(token -> kind != TK_IDENT){
+        error_at(token -> str, "expected a variable name\n");
     }
 
-    Token *name = NULL;
-    // 関数の仮引数では識別子は省略できるため。
-    if(is_ident()){
-        name = token; 
-        next_token();   
-    }
+    Token *name = token;
+    next_token();
     ty = type_suffix(ty);
     ty -> name = name;
     return ty;
+}
+
+/* abstract-declarator = "*"* ("(" abstract-declarator ")")? type-suffix */
+static Type *abstract_declarator(Type *ty){
+    while(consume("*"))
+        ty = pointer_to(ty);
+    
+    if(consume("(")){
+        Token *start = token;
+        Type dummy = {};
+        abstract_declarator(&dummy); // とりあえず読み飛ばす
+        expect(")");
+        ty = type_suffix(ty); // ()の外側の型を確定させる。
+        Token *end = token;
+        token  = start;
+        ty = abstract_declarator(ty); // ()の中の型を確定させる。
+        token = end;
+        return ty;
+    }
+
+    return type_suffix(ty);
+}
+
+static Type *typename(void){
+    Type *base = declspec(NULL);
+    return abstract_declarator(base);
 }
 
 /* declspec declarator ("=" assign)? ("," declarator ("=" assign)?)* ";" */
@@ -745,10 +776,12 @@ static Node *declaration(Type *base){
     Node *cur = &head;
     while(!consume(";")){
         Type* ty = declarator(base);
-        /* declaratorの後にチェックするのはvoid *p;のようにvoidへのpointer型は合法なため。*/
-        if(is_void(ty)){
+
+        if(ty -> size < 0)
+             error_at(ty -> name -> str, "variable hs incomplete type");
+        if(is_void(ty))
             error_at(ty -> name -> str, "variable declared void");
-        }
+
         Obj *lvar = new_lvar(get_ident(ty -> name), ty);
         
         if(consume("=")){
@@ -989,8 +1022,7 @@ Node *new_cast(Node *lhs, Type *ty){
 static Node *cast(void){
     if(is_equal(token, "(") && is_typename(token -> next)){
         consume("(");
-        Type *base = declspec(NULL);
-        Type *ty = declarator(base);
+        Type *ty = typename();
         expect(")");
         return new_cast(cast(), ty);
     }
@@ -1132,8 +1164,7 @@ static Node* primary(void){
     if(consume("sizeof")){
         if(is_equal(token, "(") && is_typename(token -> next)){
             next_token(); // '('を読み飛ばす
-            Type *base = declspec(NULL);
-            Type *ty = declarator(base);
+            Type *ty = typename();
             expect(")");
             return new_num_node(ty -> size);
         }else{
