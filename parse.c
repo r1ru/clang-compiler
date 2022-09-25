@@ -7,6 +7,10 @@ static Obj *globals;
 
 static Obj *current_fn; // 現在parseしている関数
 
+// current_fn内のlabeled statementとgotoのリスト
+static Node *labels;
+static Node *gotos;
+
 typedef struct VarScope VarScope;
 
 struct VarScope {
@@ -145,7 +149,7 @@ static Obj *new_gvar(char *name, Type *ty) {
 static char* new_unique_name(void){
     static int idx;
     char *buf = calloc(1, 10);
-    sprintf(buf, ".LC%d", idx);
+    sprintf(buf, ".L.%d", idx);
     idx++;
     return buf;
 }
@@ -273,6 +277,20 @@ static void create_param_lvars(Type* param){
     }
 }
 
+static void resolve_goto_labels(void){
+    for(Node *x = gotos; x; x = x -> goto_next){
+        for(Node *y = labels; y; y = y -> goto_next){
+            if(!strcmp(x -> label, y -> label)){
+                x -> unique_label = y -> unique_label;
+                break;
+            }
+        }
+        if(!x -> unique_label)
+            error("use of undeclaraed label");
+    }
+    gotos = labels = NULL;
+}
+
 /* function = ";" | "{" compound_stmt */
 static void function(Type *ty, VarAttr *attr){
     Obj* func = new_gvar(get_ident(ty -> name), ty);
@@ -291,6 +309,7 @@ static void function(Type *ty, VarAttr *attr){
     func -> body = compound_stmt();
     func-> locals = locals;
     leave_scope();
+    resolve_goto_labels();
 }
 
 /* expr-stmt = expr? ";" */
@@ -304,79 +323,97 @@ static Node *expr_stmt(void){
     return node;
 }
 
-/* stmt = expr ";" 
-        | "{" compound-stmt
-        | "return" expr ";" 
+/* stmt = "return" expr ";" 
         | "if" "(" expr ")" stmt ("else" stmt)?
         | "while" "(" expr ")" stmt
-        | "for" "(" expr? ";" expr? ";" expr? ")" stmt */
+        | "for" "(" expr? ";" expr? ";" expr? ")" stmt 
+        | "goto" ident 
+        | ident ":" stmt
+        | "{" compound-stmt
+        | expr-stmt */
 static Node* stmt(void){
-    Node* np;
+
+    if(consume("return")){
+        Node *node = new_node(ND_RET);
+        Node *exp = expr();
+        add_type(exp);
+        expect(";");
+        node -> lhs = new_cast(exp, current_fn -> ty -> ret_ty);
+        return node;
+    }
+
+    if(consume("if")){
+        expect("(");
+        Node *node = new_node(ND_IF);
+        node -> cond = expr();
+        expect(")");
+        node -> then = stmt();
+        if(consume("else")){
+            node -> els = stmt();
+        }
+        return node;
+    }
+
+    if(consume("while")){
+        expect("(");
+        Node *node = new_node(ND_WHILE);
+        node -> cond = expr();
+        expect(")");
+        node -> then = stmt();
+        return node;
+    }
+
+    if(consume("for")){
+        enter_scope();
+        expect("(");
+        Node *node = new_node(ND_FOR);
+        if(!is_equal(token, ";")){
+            if(is_typename(token)){
+                Type *base = declspec(NULL);
+                node -> init = declaration(base);
+            }else{
+                node -> init = expr_stmt();
+            }
+        }
+        if(!is_equal(token, ";")){
+            node -> cond = expr();
+        }
+        expect(";");
+        if(!is_equal(token, ")")){
+            node -> inc = expr();
+        }
+        expect(")");
+        node -> then = stmt();
+        leave_scope();
+        return node;
+    }
+
+    if(consume("goto")){
+        Node *node = new_node(ND_GOTO);
+        node -> label = get_ident(token);
+        next_token();
+        expect(";");
+        node -> goto_next = gotos;
+        gotos = node;
+        return node;
+    }
+
+    if(token -> kind == TK_IDENT && is_equal(token -> next, ":")){
+        Node *node = new_node(ND_LABEL);
+        node -> label = get_ident(token);
+        node -> unique_label = new_unique_name();
+        next_token();
+        expect(":");
+        node -> lhs = stmt();
+        node -> goto_next = labels;
+        labels = node;
+        return node;
+    }
 
     if(consume("{")){
         return compound_stmt();
     }
 
-    /* "return" expr ";" */
-    if(consume("return")){
-        np = new_node(ND_RET);
-        Node *exp = expr();
-        add_type(exp);
-        expect(";");
-        np -> lhs = new_cast(exp, current_fn -> ty -> ret_ty);
-        return np;
-    }
-
-    /* "if" "(" expr ")" stmt ("else" stmt)? */
-    if(consume("if")){
-        expect("(");
-        np = new_node(ND_IF);
-        np -> cond = expr();
-        expect(")");
-        np -> then = stmt();
-        if(consume("else")){
-            np -> els = stmt();
-        }
-        return np;
-    }
-
-    /* "while" "(" expr ")" stmt */
-    if(consume("while")){
-        expect("(");
-        np = new_node(ND_WHILE);
-        np -> cond = expr();
-        expect(")");
-        np -> then = stmt();
-        return np;
-    }
-
-    /* "for" "(" expr? ";" expr? ";" expr? ")" stmt */
-    if(consume("for")){
-        enter_scope();
-        expect("(");
-        np = new_node(ND_FOR);
-        if(!is_equal(token, ";")){
-            if(is_typename(token)){
-                Type *base = declspec(NULL);
-                np -> init = declaration(base);
-            }else{
-                np -> init = expr_stmt();
-            }
-        }
-        if(!is_equal(token, ";")){
-            np -> cond = expr();
-        }
-        expect(";");
-        if(!is_equal(token, ")")){
-            np -> inc = expr();
-        }
-        expect(")");
-        np -> then = stmt();
-        leave_scope();
-        return np;
-    }
-
-    /* expr ";" */
     return expr_stmt();
 }
 
@@ -397,7 +434,7 @@ static Node* compound_stmt(void){
     Node *cur = &head;
     enter_scope();
     while(!consume("}")){
-        if(is_typename(token)){
+        if(is_typename(token) && !is_equal(token -> next, ":")){
             VarAttr attr = {};
             Type *base = declspec(&attr);
             if(attr.is_typedef){

@@ -378,6 +378,15 @@ static void gen_stmt(Node* node){
             fprintf(STREAM, ".L.end.%u:\n", idx);
             return;
         }
+
+        case ND_GOTO:
+            fprintf(STREAM, "\tjmp %s\n", node -> unique_label);
+            return;
+        
+        case ND_LABEL:
+            fprintf(STREAM, "%s:\n", node -> unique_label);
+            gen_stmt(node -> lhs);
+            return;
         
         case ND_BLOCK:
             for(Node *stmt = node -> body; stmt; stmt = stmt -> next){

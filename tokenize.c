@@ -113,7 +113,7 @@ static bool startswith(char* p1, char* p2){
 }
 
 static bool is_keyword(Token *tok){
-    static char* kw[] = {"return", "if", "else", "while", "for", "int", "sizeof", "char", "struct", "union", "long", "short", "void", "typedef", "_Bool", "enum", "static"};
+    static char* kw[] = {"return", "if", "else", "while", "for", "int", "sizeof", "char", "struct", "union", "long", "short", "void", "typedef", "_Bool", "enum", "static", "goto"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(tok, kw[i])){
             return true;
@@ -130,7 +130,7 @@ static int read_puct(char *p){
             return strlen(kw[i]);
         }
     }
-    // +-*/()<>;={},&[].!~%^|
+    // +-*/()<>;={},&[].!~%^|:
     return ispunct(*p) ? 1 : 0;
 }
 

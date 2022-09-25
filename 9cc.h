@@ -181,7 +181,9 @@ typedef enum{
     ND_LOGOR, // ||
     ND_MEMBER, // .
     ND_CAST,
-    ND_COMMA // ,
+    ND_COMMA, // ,
+    ND_GOTO, // goto
+    ND_LABEL // labeled statement
 }NodeKind;
 
 struct Node{
@@ -203,6 +205,11 @@ struct Node{
 
     char* funcname; // function name
     Node* args; // argments;
+
+    // goto and labeled statement
+    char *label;
+    char *unique_label;
+    Node *goto_next;
 
     Node* body; // ND_BLOCK or ND_STMT_EXPR
     int64_t val; // ND_NUM用
