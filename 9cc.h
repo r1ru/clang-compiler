@@ -162,6 +162,7 @@ typedef enum{
     ND_LE, // <= less than or equal to
     ND_NEG, // negative number
     ND_ASSIGN, // =
+    ND_COND, // ?:
     ND_VAR, // variable
     ND_NUM,
     ND_RET, // return

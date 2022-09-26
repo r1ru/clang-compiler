@@ -216,6 +216,7 @@ static Node* compound_stmt(void);
 static Node* declaration(Type *base);
 static Node* expr(void);
 static Node* assign(void);
+static Node *conditional(void);
 static Node *logor(void);
 static Node *logand(void);
 static Node *bitor(void);
@@ -969,10 +970,10 @@ static Node *to_assign(Node *binary){
     return new_binary(ND_COMMA, expr1, expr2);
 }
 
-/*  assign = logor (assing_op assign)?
+/*  assign = conditional (assing_op assign)?
     assing-op = "+=" | "-=" | "*=" | "/=" | "%=" | "|=" | "^=" | "&=" | "<<=" | ">>=" | "=" */
 static Node* assign(void){
-    Node* node = logor();
+    Node* node = conditional();
     if(consume("+="))
         node = to_assign(new_add(node, assign()));
     if(consume("-="))
@@ -995,6 +996,19 @@ static Node* assign(void){
         node = to_assign(new_binary(ND_SHR, node, assign()));
     if(consume("="))
         node = new_binary(ND_ASSIGN, node, assign());
+    return node;
+}
+
+/* conditional = logor ("?" expr ":" conditional)? */
+static Node *conditional(void){
+    Node *cond = logor();
+    if(!consume("?"))
+        return cond;
+    Node *node = new_node(ND_COND);
+    node -> cond = cond;
+    node -> then = expr();
+    expect(":");
+    node -> els = conditional();
     return node;
 }
 

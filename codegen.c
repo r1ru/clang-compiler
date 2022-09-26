@@ -223,6 +223,19 @@ static void gen_expr(Node* node){
             gen_expr(node -> lhs);
             cast(node -> lhs -> ty, node ->ty);
             return;
+
+        case ND_COND:{
+            int idx = get_index();
+            gen_expr(node -> cond);
+            fprintf(STREAM, "\tcmp rax, 0\n");
+            fprintf(STREAM, "\tje .L.else.%d\n", idx);
+            gen_expr(node -> then);
+            fprintf(STREAM, "\tjmp .L.end.%d\n", idx);
+            fprintf(STREAM, ".L.else.%d:\n", idx);
+            gen_expr(node -> els);
+            fprintf(STREAM, ".L.end.%d:\n", idx);
+            return;
+        }
         
         case ND_COMMA:
             gen_expr(node -> lhs);

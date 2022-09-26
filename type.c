@@ -202,6 +202,15 @@ void add_type(Node *node) {
             node -> ty = node -> member -> ty;
             return;
         
+        case ND_COND:
+            if (node -> then -> ty -> kind == TY_VOID || node -> els -> ty -> kind == TY_VOID) {
+                node -> ty = ty_void;
+            } else {
+            usual_arith_conv(&node -> then, &node -> els);
+            node -> ty = node -> then -> ty;
+            }
+            return;
+        
         case ND_COMMA:
             node -> ty = node -> rhs -> ty;
             return;
