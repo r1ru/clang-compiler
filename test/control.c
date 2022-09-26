@@ -34,6 +34,12 @@ int main() {
     ASSERT(3, ({ int i=0; goto a; a: i++; b: i++; c: i++; i; }));
     ASSERT(2, ({ int i=0; goto e; d: i++; e: i++; f: i++; i; }));
     ASSERT(1, ({ int i=0; goto i; g: i++; h: i++; i: i++; i; }));
+
+    ASSERT(3, ({ int i=0; for(;i<10;i++) { if (i == 3) break; } i; }));
+    ASSERT(4, ({ int i=0; while (1) { if (i++ == 3) break; } i; }));
+    ASSERT(3, ({ int i=0; for(;i<10;i++) { for (;;) break; if (i == 3) break; } i; }));
+    ASSERT(4, ({ int i=0; while (1) { while(1) break; if (i++ == 3) break; } i; }));
+
             
     printf("OK\n");
     return 0;

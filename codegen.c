@@ -351,10 +351,10 @@ static void gen_stmt(Node* node){
             fprintf(STREAM, ".L.begin.%u:\n", idx);
             gen_expr(node -> cond);
             fprintf(STREAM, "\tcmp rax, 0\n");
-            fprintf(STREAM, "\tje .L.end.%u\n", idx); // 条件式が偽の時は終了
+            fprintf(STREAM, "\tje %s\n", node -> brk_label); // 条件式が偽の時は終了
             gen_stmt(node -> then); // 条件式が真の時に実行される。
             fprintf(STREAM, "\tjmp .L.begin.%u\n", idx); // 条件式の評価に戻る
-            fprintf(STREAM, ".L.end.%u:\n", idx);
+            fprintf(STREAM, "%s:\n", node -> brk_label);
             return;
         }
 
@@ -367,7 +367,7 @@ static void gen_stmt(Node* node){
             if(node -> cond){
                 gen_expr(node -> cond);
                 fprintf(STREAM, "\tcmp rax, 0\n");
-                fprintf(STREAM, "\tje .L.end.%u\n", idx); // 条件式が偽の時は終了
+                fprintf(STREAM, "\tje %s\n", node -> brk_label); // 条件式が偽の時は終了
 
             }
             gen_stmt(node -> then); // thenは必ずあることが期待されている。
@@ -375,7 +375,7 @@ static void gen_stmt(Node* node){
                 gen_expr(node -> inc);
             }
             fprintf(STREAM, "\tjmp .L.begin.%u\n", idx); // 条件式の評価に戻る
-            fprintf(STREAM, ".L.end.%u:\n", idx);
+            fprintf(STREAM, "%s:\n", node -> brk_label);
             return;
         }
 

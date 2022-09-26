@@ -200,6 +200,7 @@ struct Node{
     Node* els; 
     Node* init; 
     Node* inc; 
+    char *brk_label;
 
     Member *member; // 構造体のメンバ
 

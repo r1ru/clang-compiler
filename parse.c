@@ -11,6 +11,8 @@ static Obj *current_fn; // 現在parseしている関数
 static Node *labels;
 static Node *gotos;
 
+static char* brk_label;
+
 typedef struct VarScope VarScope;
 
 struct VarScope {
@@ -329,6 +331,7 @@ static Node *expr_stmt(void){
         | "for" "(" expr? ";" expr? ";" expr? ")" stmt 
         | "goto" ident 
         | ident ":" stmt
+        | "break" ";"
         | "{" compound-stmt
         | expr-stmt */
 static Node* stmt(void){
@@ -355,25 +358,28 @@ static Node* stmt(void){
     }
 
     if(consume("while")){
-        expect("(");
         Node *node = new_node(ND_WHILE);
+        char *brk = brk_label;
+        brk_label = node -> brk_label = new_unique_name();
+        expect("(");
         node -> cond = expr();
         expect(")");
         node -> then = stmt();
+        brk_label = brk;
         return node;
     }
 
     if(consume("for")){
         enter_scope();
-        expect("(");
         Node *node = new_node(ND_FOR);
-        if(!is_equal(token, ";")){
-            if(is_typename(token)){
-                Type *base = declspec(NULL);
-                node -> init = declaration(base);
-            }else{
-                node -> init = expr_stmt();
-            }
+        char *brk = brk_label;
+        brk_label = node -> brk_label = new_unique_name();
+        expect("(");
+        if(is_typename(token)){
+            Type *base = declspec(NULL);
+            node -> init = declaration(base);
+        }else{
+            node -> init = expr_stmt();
         }
         if(!is_equal(token, ";")){
             node -> cond = expr();
@@ -384,6 +390,7 @@ static Node* stmt(void){
         }
         expect(")");
         node -> then = stmt();
+        brk_label = brk;
         leave_scope();
         return node;
     }
@@ -407,6 +414,15 @@ static Node* stmt(void){
         node -> lhs = stmt();
         node -> goto_next = labels;
         labels = node;
+        return node;
+    }
+
+    if(consume("break")){
+        if(!brk_label)
+            error("stary break");
+        Node *node = new_node(ND_GOTO);
+        node -> unique_label = brk_label;
+        expect(";");
         return node;
     }
 
