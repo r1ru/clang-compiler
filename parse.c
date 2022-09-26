@@ -214,6 +214,7 @@ static Node *expr_stmt(void);
 static Node* stmt(void);
 static Node* compound_stmt(void);
 static Node* declaration(Type *base);
+static int64_t const_expr(void);
 static Node* expr(void);
 static Node* assign(void);
 static Node *conditional(void);
@@ -339,7 +340,7 @@ static Node *expr_stmt(void){
         | "break" ";"
         | "continue" ";"
         | switch "(" expr ")" stmt
-        | "case" num ":" stmt
+        | "case" const-expr ":" stmt
         | "default" ":" stmt
         | "{" compound-stmt
         | expr-stmt */
@@ -469,7 +470,7 @@ static Node* stmt(void){
             error("stray case");
         
         Node *node = new_node(ND_CASE);
-        node -> val = expect_number();
+        node -> val = const_expr();
         expect(":");
 
         node -> unique_label = new_unique_name();
@@ -658,7 +659,7 @@ static Type *union_decl(void){
 /*  enum-specifier   = ident? "{" enum-list? "}"
                     | ident
     enum-list       = enumerator ("," enumerator)*
-    enumerator      = ident ( "=" constant-expression )? */
+    enumerator      = ident ( "=" const-expression )? */
 static Type *enum_specifier(void){
     Token *tag = NULL;
     Type *ty = enum_type();
@@ -679,13 +680,12 @@ static Type *enum_specifier(void){
 
     expect("{");
 
-    int val = 0;
+    int64_t val = 0;
     while(!consume("}")){
         char *name = get_ident(token);
         next_token();
         if(consume("=")){
-            val = get_number(token);
-            next_token();
+            val = const_expr();
         }
         VarScope *vsc = push_scope(name);
         vsc -> enum_ty = ty;
@@ -849,13 +849,13 @@ static Type* type_suffix(Type *ty){
     return ty;
 }
 
-/* array-dementions = num? "}" type-suffix */
+/* array-dementions = const-expr? "}" type-suffix */
 static Type *array_dementions(Type *ty){
     if(consume("]")){
         ty = type_suffix(ty);
         return array_of(ty, -1);
     }
-    int siz = expect_number();
+    int siz = const_expr();
     expect("]");
     ty = type_suffix(ty);
     return array_of(ty , siz);
@@ -946,6 +946,77 @@ static Node *declaration(Type *base){
     Node *node = new_node(ND_BLOCK);
     node -> body = head.next;
     return node;
+}
+
+// 構文木を下りながら計算して値を返す 
+static int64_t eval(Node *node){
+    add_type(node);
+
+    switch(node -> kind){
+        case ND_ADD:
+            return eval(node -> lhs) + eval(node -> rhs);
+        case ND_SUB:
+            return eval(node -> lhs) - eval(node -> rhs);
+        case ND_MUL:
+            return eval(node -> lhs) * eval(node -> rhs);
+        case ND_DIV:
+            return eval(node -> lhs) / eval(node -> rhs);
+        case ND_MOD:
+            return eval(node -> lhs) % eval(node -> rhs);
+        case ND_EQ:
+            return eval(node -> lhs) == eval(node -> rhs);
+        case ND_NE:
+            return eval(node -> lhs) != eval(node -> rhs);
+        case ND_LT:
+            return eval(node -> lhs) < eval(node -> rhs);
+        case ND_LE:
+            return eval(node -> lhs) <= eval(node -> rhs);
+        case ND_NEG:
+            return -eval(node -> lhs);
+        case ND_COND:
+            return eval(node -> cond) ? eval(node -> then) : eval(node -> els);
+        case ND_NOT:
+            return !eval(node -> lhs);
+        case ND_BITNOT:
+            return ~eval(node -> lhs);
+        case ND_BITOR:
+            return eval(node -> lhs) | eval(node -> rhs);
+        case ND_BITXOR:
+            return eval(node -> lhs) ^ eval(node -> rhs);
+        case ND_BITAND: 
+            return eval(node -> lhs) & eval(node -> rhs);
+        case ND_SHL:
+            return eval(node -> lhs) << eval(node -> rhs);
+        case ND_SHR:
+            return eval(node -> lhs) >> eval(node -> rhs);
+        case ND_LOGAND:
+            return eval(node -> lhs) && eval(node -> rhs);
+        case ND_LOGOR:
+            return eval(node -> lhs) || eval(node -> rhs);
+        case ND_COMMA:
+            return eval(node -> rhs);
+        case ND_CAST:
+            if(is_integer(node -> ty)){
+                switch(node -> ty -> size){
+                    case 1:
+                        return (int8_t)eval(node  -> lhs);
+                    case 2:
+                        return (int16_t)eval(node -> lhs);
+                    case 4:
+                        return (int32_t)eval(node -> lhs);
+                }
+            }
+            return eval(node -> lhs);
+        case ND_NUM:
+            return node -> val;
+    }  
+    error("not a compile-time constant");
+}
+
+// const-expr = conditional
+static int64_t const_expr(void){
+    Node* node = conditional();
+    return eval(node);
 }
 
 /* expr = assign ("," expr)? */
@@ -1355,8 +1426,13 @@ static Node* primary(void){
         }
     }
 
-    /* そうでなければ数値のはず */
-    return new_num_node(expect_number());
+    if(token -> kind == TK_NUM){
+        Node *node = new_num_node(token -> val);
+        next_token();
+        return node;
+    }
+
+    error_at(token -> str, "expected an expression\n");
 }
 
 /* funcall = ident "(" func-args? ")" */

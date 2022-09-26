@@ -33,7 +33,7 @@ typedef enum{
 struct Token{
     Token* next;
     TokenKind kind;
-    uint64_t val;
+    int64_t val;
     char* str;
     int len; // トークンの長さ
 };
