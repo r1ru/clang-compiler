@@ -353,6 +353,7 @@ static void gen_stmt(Node* node){
             fprintf(STREAM, "\tcmp rax, 0\n");
             fprintf(STREAM, "\tje %s\n", node -> brk_label); // 条件式が偽の時は終了
             gen_stmt(node -> then); // 条件式が真の時に実行される。
+            fprintf(STREAM, "%s:\n", node -> cont_label);
             fprintf(STREAM, "\tjmp .L.begin.%u\n", idx); // 条件式の評価に戻る
             fprintf(STREAM, "%s:\n", node -> brk_label);
             return;
@@ -371,6 +372,7 @@ static void gen_stmt(Node* node){
 
             }
             gen_stmt(node -> then); // thenは必ずあることが期待されている。
+            fprintf(STREAM, "%s:\n", node -> cont_label);
             if(node -> inc){
                 gen_expr(node -> inc);
             }

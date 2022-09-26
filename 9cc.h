@@ -201,6 +201,7 @@ struct Node{
     Node* init; 
     Node* inc; 
     char *brk_label;
+    char *cont_label;
 
     Member *member; // 構造体のメンバ
 

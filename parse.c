@@ -11,7 +11,8 @@ static Obj *current_fn; // 現在parseしている関数
 static Node *labels;
 static Node *gotos;
 
-static char* brk_label;
+static char *brk_label;
+static char *cont_label;
 
 typedef struct VarScope VarScope;
 
@@ -332,6 +333,7 @@ static Node *expr_stmt(void){
         | "goto" ident 
         | ident ":" stmt
         | "break" ";"
+        | "continue" ";"
         | "{" compound-stmt
         | expr-stmt */
 static Node* stmt(void){
@@ -360,12 +362,15 @@ static Node* stmt(void){
     if(consume("while")){
         Node *node = new_node(ND_WHILE);
         char *brk = brk_label;
+        char *cont = cont_label;
         brk_label = node -> brk_label = new_unique_name();
+        cont_label = node -> cont_label = new_unique_name();
         expect("(");
         node -> cond = expr();
         expect(")");
         node -> then = stmt();
         brk_label = brk;
+        cont_label = cont;
         return node;
     }
 
@@ -373,7 +378,9 @@ static Node* stmt(void){
         enter_scope();
         Node *node = new_node(ND_FOR);
         char *brk = brk_label;
+        char *cont = cont_label;
         brk_label = node -> brk_label = new_unique_name();
+        cont_label = node -> cont_label = new_unique_name();
         expect("(");
         if(is_typename(token)){
             Type *base = declspec(NULL);
@@ -391,6 +398,7 @@ static Node* stmt(void){
         expect(")");
         node -> then = stmt();
         brk_label = brk;
+        cont_label = cont;
         leave_scope();
         return node;
     }
@@ -422,6 +430,15 @@ static Node* stmt(void){
             error("stary break");
         Node *node = new_node(ND_GOTO);
         node -> unique_label = brk_label;
+        expect(";");
+        return node;
+    }
+
+    if(consume("continue")){
+        if(!cont_label)
+            error("stary continue");
+        Node *node = new_node(ND_GOTO);
+        node -> unique_label = cont_label;
         expect(";");
         return node;
     }
