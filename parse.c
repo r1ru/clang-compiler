@@ -223,6 +223,7 @@ static Node *bitxor(void);
 static Node *bitand(void);
 static Node* equality(void);
 static Node * relational(void);
+static Node *shift(void);
 static Node* new_add(Node *lhs, Node *rhs);
 static Node* new_sub(Node *lhs, Node *rhs);
 static Node* add(void);
@@ -969,7 +970,7 @@ static Node *to_assign(Node *binary){
 }
 
 /*  assign = logor (assing_op assign)?
-    assing-op = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "|=" |"^= | "&=" */
+    assing-op = "+=" | "-=" | "*=" | "/=" | "%=" | "|=" | "^=" | "&=" | "<<=" | ">>=" | "=" */
 static Node* assign(void){
     Node* node = logor();
     if(consume("+="))
@@ -988,6 +989,10 @@ static Node* assign(void){
         node = to_assign(new_binary(ND_BITXOR, node, assign()));
     if(consume("&="))
         node = to_assign(new_binary(ND_BITAND, node, assign()));
+    if(consume("<<="))
+        node = to_assign(new_binary(ND_SHL, node, assign()));
+    if(consume(">>="))
+        node = to_assign(new_binary(ND_SHR, node, assign()));
     if(consume("="))
         node = new_binary(ND_ASSIGN, node, assign());
     return node;
@@ -1049,27 +1054,43 @@ static Node* equality(void){
     }
 }
 
-/* relational = add ("<" add | "<=" add | ">" add | ">=" add)* */
+/* relational = shift ("<" shift | "<=" shift | ">" shift | ">=" shift)* */
 static Node* relational(void){
-    Node* np = add();
+    Node* node = shift();
     for(;;){
         if(consume("<")){
-            np = new_binary(ND_LT, np, add());
+            node = new_binary(ND_LT, node, shift());
             continue;
         }
         if(consume("<=")){
-            np = new_binary(ND_LE, np , add());
+            node = new_binary(ND_LE, node , shift());
             continue;
         }
         if(consume(">")){
-            np = new_binary(ND_LT, add(), np); /* x > y は y < xと同じ。 */
+            node = new_binary(ND_LT, shift(), node); /* x > y は y < xと同じ。 */
             continue;
         }
         if(consume(">=")){
-            np = new_binary(ND_LE, add(), np); /* x >= y は y <= xと同じ */
+            node = new_binary(ND_LE, shift(), node); /* x >= y は y <= xと同じ */
             continue;
         }
-        return np;
+        return node;
+    }
+}
+
+/* shift = add ("<<" shift || ">>" shift)* */
+static Node *shift(void){
+    Node *node = add();
+    for(;;){
+        if(consume("<<")){
+            node = new_binary(ND_SHL, node, add());
+            continue;
+        }
+        if(consume(">>")){
+            node = new_binary(ND_SHR, node, add());
+            continue;
+        }
+        return node;
     }
 }
 

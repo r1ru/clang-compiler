@@ -173,7 +173,9 @@ void add_type(Node *node) {
             node -> ty = ty_int;
             return;
         case ND_BITNOT:
-            node->ty = node->lhs->ty;
+        case ND_SHL:
+        case ND_SHR:
+            node->ty = node -> lhs ->ty;
             return;
         case ND_ASSIGN:
             if(is_array(node -> lhs ->ty)){

@@ -178,6 +178,8 @@ typedef enum{
     ND_BITOR, // |
     ND_BITXOR, // ^
     ND_BITAND, // &
+    ND_SHL, // shift left
+    ND_SHR, // shift right
     ND_LOGAND, // &&
     ND_LOGOR, // ||
     ND_MEMBER, // .

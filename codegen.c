@@ -300,6 +300,16 @@ static void gen_expr(Node* node){
         case ND_BITAND:
             fprintf(STREAM, "\tand rax, rdi\n");
             return;
+
+        case ND_SHL:
+            fprintf(STREAM, "\tmov rcx, rdi\n");
+            fprintf(STREAM, "\tshl rax, cl\n");
+            return;
+        
+        case ND_SHR:
+            fprintf(STREAM, "\tmov rcx, rdi\n");
+            fprintf(STREAM, "\tsar rax, cl\n");
+            return;
         
         case ND_EQ:
         case ND_NE:
