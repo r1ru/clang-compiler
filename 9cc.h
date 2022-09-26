@@ -166,8 +166,7 @@ typedef enum{
     ND_NUM,
     ND_RET, // return
     ND_IF, // if
-    ND_WHILE, // while
-    ND_FOR, // for
+    ND_FOR, // for and while
     ND_BLOCK, // {}
     ND_FUNCCALL, // function call
     ND_ADDR, // unary &

@@ -360,7 +360,7 @@ static Node* stmt(void){
     }
 
     if(consume("while")){
-        Node *node = new_node(ND_WHILE);
+        Node *node = new_node(ND_FOR);
         char *brk = brk_label;
         char *cont = cont_label;
         brk_label = node -> brk_label = new_unique_name();

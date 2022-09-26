@@ -346,21 +346,8 @@ static void gen_stmt(Node* node){
             return;
         }
 
-        case ND_WHILE:{
-            int idx = get_index();
-            fprintf(STREAM, ".L.begin.%u:\n", idx);
-            gen_expr(node -> cond);
-            fprintf(STREAM, "\tcmp rax, 0\n");
-            fprintf(STREAM, "\tje %s\n", node -> brk_label); // 条件式が偽の時は終了
-            gen_stmt(node -> then); // 条件式が真の時に実行される。
-            fprintf(STREAM, "%s:\n", node -> cont_label);
-            fprintf(STREAM, "\tjmp .L.begin.%u\n", idx); // 条件式の評価に戻る
-            fprintf(STREAM, "%s:\n", node -> brk_label);
-            return;
-        }
-
         case ND_FOR:{
-            int idx = get_index(); // インデックスを更新
+            int idx = get_index();
             if(node -> init){
                 gen_stmt(node -> init);
             }
