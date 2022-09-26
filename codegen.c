@@ -377,6 +377,26 @@ static void gen_stmt(Node* node){
             gen_stmt(node -> lhs);
             return;
         
+        case ND_SWITCH:
+            gen_expr(node -> cond);
+            for(Node *n = node -> case_next; n; n = n -> case_next){
+                fprintf(STREAM, "\tcmp rax, %ld\n", n -> val);
+                fprintf(STREAM, "\tje %s\n", n -> unique_label);
+            }
+            if(node -> default_case)
+                fprintf(STREAM, "jmp %s\n", node -> default_case -> unique_label);
+            // 該当するcaseがなかった時
+            fprintf(STREAM, "\tjmp %s\n", node -> brk_label);
+
+            gen_stmt(node -> then);
+            fprintf(STREAM, "%s:\n", node -> brk_label);
+            return;
+        
+        case ND_CASE:
+            fprintf(STREAM, "%s:", node -> unique_label);
+            gen_stmt(node -> lhs);
+            return;
+        
         case ND_BLOCK:
             for(Node *stmt = node -> body; stmt; stmt = stmt -> next){
                 gen_stmt(stmt);

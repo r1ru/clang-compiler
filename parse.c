@@ -14,6 +14,8 @@ static Node *gotos;
 static char *brk_label;
 static char *cont_label;
 
+static Node *current_switch;
+
 typedef struct VarScope VarScope;
 
 struct VarScope {
@@ -334,6 +336,9 @@ static Node *expr_stmt(void){
         | ident ":" stmt
         | "break" ";"
         | "continue" ";"
+        | switch "(" expr ")" stmt
+        | "case" num ":" stmt
+        | "default" ":" stmt
         | "{" compound-stmt
         | expr-stmt */
 static Node* stmt(void){
@@ -440,6 +445,52 @@ static Node* stmt(void){
         Node *node = new_node(ND_GOTO);
         node -> unique_label = cont_label;
         expect(";");
+        return node;
+    }
+
+    if(consume("switch")){
+        Node *sw = current_switch;
+        Node *node = current_switch = new_node(ND_SWITCH);
+        char *brk = brk_label;
+        brk_label = node -> brk_label = new_unique_name(); 
+        expect("(");
+        node -> cond = expr();
+        expect(")");
+        node -> then = stmt();
+        brk_label = brk;
+        current_switch = sw;
+        return node;
+    }
+
+    if(consume("case")){
+        if(!current_switch)
+            error("stray case");
+        
+        Node *node = new_node(ND_CASE);
+        node -> val = expect_number();
+        expect(":");
+
+        node -> unique_label = new_unique_name();
+        node -> lhs = stmt();
+
+        /* リストに登録 */
+        node -> case_next = current_switch -> case_next;
+        current_switch -> case_next = node;
+
+        return node;
+    }
+
+    if(consume("default")){
+        if(!current_switch)
+            error("stary default");
+        if(current_switch -> default_case)
+            error("muliple default labels in one switch");
+        
+        expect(":");
+        Node *node = new_node(ND_CASE);
+        node -> unique_label = new_unique_name();
+        node -> lhs = stmt();
+        current_switch -> default_case = node;
         return node;
     }
 

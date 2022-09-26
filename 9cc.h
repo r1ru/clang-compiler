@@ -167,6 +167,8 @@ typedef enum{
     ND_RET, // return
     ND_IF, // if
     ND_FOR, // for and while
+    ND_SWITCH, // switch
+    ND_CASE, // case
     ND_BLOCK, // {}
     ND_FUNCCALL, // function call
     ND_ADDR, // unary &
@@ -211,6 +213,10 @@ struct Node{
     char *label;
     char *unique_label;
     Node *goto_next;
+
+    // switch-case
+    Node *case_next;
+    Node *default_case; 
 
     Node* body; // ND_BLOCK or ND_STMT_EXPR
     int64_t val; // ND_NUM用
