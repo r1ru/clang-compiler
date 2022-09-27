@@ -12,9 +12,13 @@
 #include <assert.h>
 #include <errno.h>
 
+#define MAX(x, y) ((x) < (y) ? (y) : (x))
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
+
 #define STREAM stdout
 #define ERROR stderr
 
+typedef struct Type Type;
 typedef struct Node Node;
 typedef struct Member Member;
 
@@ -34,6 +38,7 @@ struct Token{
     Token* next;
     TokenKind kind;
     int64_t val;
+    Type *ty; // TK_STRの時のみ使用
     char* str;
     int len; // トークンの長さ
 };
@@ -66,7 +71,6 @@ typedef enum{
     TY_ENUM
 }TypeKind;
 
-typedef struct Type Type;
 struct Type{
     TypeKind kind;
     int size;

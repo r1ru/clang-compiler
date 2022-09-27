@@ -208,6 +208,7 @@ static Token *read_string_literal(char *start){
             buf[len++] = *p++;
     }
     Token *tok = new_token(TK_STR, start, end + 1); // ""を含めた長さ(トークンの長さ)
+    tok -> ty = array_of(ty_char, len + 1); // NULL文字分+1
     tok -> str = buf; // bufに保存されるのは""の中のみ  
     return tok;
 }

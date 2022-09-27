@@ -172,8 +172,7 @@ static char* new_unique_name(void){
 }
 
 static Obj *new_string_literal(Token *tok){
-    Type *ty = array_of(ty_char, tok -> len - 1); // ""ぶんだけ引いてnull文字分+1
-    Obj *strl = new_gvar(new_unique_name(), ty);
+    Obj *strl = new_gvar(new_unique_name(), tok -> ty);
     strl -> str = tok -> str;
     return strl;
 }
@@ -226,6 +225,7 @@ static Node *expr_stmt(void);
 static Node* stmt(void);
 static Node* compound_stmt(void);
 static Node* declaration(Type *base);
+static void assign_initializer(Initializer *init);
 static Node *lvar_initializer(Obj *var);
 static int64_t const_expr(void);
 static Node* expr(void);
@@ -971,7 +971,7 @@ static Initializer *new_initializer(Type *ty){
     return init;
 }
 
-// {が出てきたら}まで読み飛ばす。それ以外はassignを一つ読み飛ばす。
+// {が出てきたら}まで読み飛ばす。それ以外はassignか文字列リテラルを一つ読み飛ばす。
 static void skip_excess_element(void){
     if(consume("{")){
         for(int i = 0; !consume("}"); i++){
@@ -981,23 +981,42 @@ static void skip_excess_element(void){
         }
         return;
     }
-    assign();
+    if(token -> kind == TK_STR)
+        next_token();
+    else 
+        assign();
 }
 
-/* initializer  = "{" initializer ("," initializer)* "}"
-                | assign */
+// stirng-intizlier = string-literal
+static void string_initializer(Initializer *init){
+    int len = MIN(init -> ty -> array_len, token -> ty -> array_len);
+    for(int i = 0; i < len; i++){
+        init -> children[i] -> expr = new_num_node(token -> str[i]);
+    }
+    next_token();
+}
+
+// array-initializer = "{" initializer ("," initizlier )* "}"
+static void array_initializer(Initializer *init){
+    expect("{");
+    for(int i = 0; !consume("}"); i++){
+        if(0 < i)
+            expect(",");
+
+        if(i < init -> ty -> array_len)
+            assign_initializer(init -> children[i]);
+        else 
+            skip_excess_element();
+    }
+}
+
+// initializer  = stirng-initializer | array-initialzier | assign 
 static void assign_initializer(Initializer *init){
     if(init -> ty -> kind == TY_ARRAY){
-        expect("{");
-        for(int i = 0; !consume("}"); i++){
-            if(0 < i)
-                expect(",");
-
-            if(i < init -> ty -> array_len)
-                assign_initializer(init -> children[i]);
-            else 
-                skip_excess_element();
-        }
+        if(token -> kind == TK_STR)
+            string_initializer(init);
+        else 
+            array_initializer(init);
         return;
     }
     init -> expr = assign();
