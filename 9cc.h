@@ -149,7 +149,7 @@ struct Obj{
 };
 
 typedef enum{
-    ND_NULl_EXPR, // do nothing
+    ND_NULL_EXPR, // do nothing
     ND_EXPR_STMT, // expression statement
     ND_STMT_EXPR, // [GNU] statement expression
     ND_ADD,
@@ -188,7 +188,8 @@ typedef enum{
     ND_CAST,
     ND_COMMA, // ,
     ND_GOTO, // goto
-    ND_LABEL // labeled statement
+    ND_LABEL, // labeled statement
+    ND_MEMZERO // zero clear stack variable
 }NodeKind;
 
 struct Node{

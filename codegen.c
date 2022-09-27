@@ -153,7 +153,7 @@ static void cast(Type *from, Type *to){
 /* 式の評価結果はraxレジスタに格納される。 */
 static void gen_expr(Node* node){
     switch(node -> kind){
-        case ND_NULl_EXPR:
+        case ND_NULL_EXPR:
             return;
         
         case ND_NUM:
@@ -225,6 +225,14 @@ static void gen_expr(Node* node){
         case ND_CAST:
             gen_expr(node -> lhs);
             cast(node -> lhs -> ty, node ->ty);
+            return;
+
+        case ND_MEMZERO:
+            // rep stosb 命令はmemset(rdi, al, rcx)と同じ
+            fprintf(STREAM, "\tmov rcx, %d\n", node -> var -> ty -> size);
+            fprintf(STREAM, "\tlea rdi, [rbp - %d]\n", node -> var -> offset);
+            fprintf(STREAM, "\tmov eax, 0\n");
+            fprintf(STREAM, "\trep stosb\n");
             return;
 
         case ND_COND:{

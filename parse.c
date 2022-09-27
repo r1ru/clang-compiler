@@ -976,7 +976,7 @@ static Initializer *new_initializer(Type *ty){
 static void assign_initializer(Initializer *init){
     if(init -> ty -> kind == TY_ARRAY){
         expect("{");
-        for(int i = 0; i < init -> ty -> array_len; i++){
+        for(int i = 0; i < init -> ty -> array_len && !is_equal(token, "}"); i++){
             if(0 < i)
                 expect(",");
             assign_initializer(init -> children[i]);
@@ -997,7 +997,7 @@ static Node *create_target(InitDesg *desg){
 
 static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg){
     if(ty -> kind == TY_ARRAY){
-        Node *node = new_node(ND_NULl_EXPR);
+        Node *node = new_node(ND_NULL_EXPR);
         for(int i = 0; i < ty -> array_len; i++){
             InitDesg desg2 = {desg, i};
             Node *rhs = create_lvar_init(init -> children[i], ty -> base, &desg2);
@@ -1005,16 +1005,27 @@ static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg){
         }
         return node;
     }
+
+    // 初期化式が明示されていなければ代入式を作る必要はない
+    if(!init -> expr)
+        return new_node(ND_NULL_EXPR);
+    
+    // 初期化式が指定されていれば代入式を作る
     Node *lhs = create_target(desg);
-    Node *rhs = init -> expr;
-    return new_binary(ND_ASSIGN, lhs, rhs);
+    return new_binary(ND_ASSIGN, lhs, init -> expr);
 }   
 
 static Node *lvar_initializer(Obj *var){
     Initializer *init = new_initializer(var -> ty);
     assign_initializer(init);
     InitDesg desg = {NULL, 0, var};
-    return create_lvar_init(init, var -> ty, &desg);
+    
+    // 先頭で配列を0クリアする
+    Node *lhs = new_node(ND_MEMZERO);
+    lhs -> var = var;
+    
+    Node *rhs = create_lvar_init(init, var -> ty, &desg);
+    return new_binary(ND_COMMA, lhs, rhs);
 }
 
 // 構文木を下りながら計算して値を返す 
