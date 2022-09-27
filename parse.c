@@ -49,6 +49,24 @@ struct Scope{
 
 static Scope *scope = &(Scope){}; //現在のスコープ
 
+typedef struct Initializer Initializer;
+struct Initializer{
+    Initializer *next; // global variableに使う
+    Type *ty;
+    Token *tok; // for error report
+    
+    Node *expr;
+
+    Initializer **children;
+};
+
+typedef struct InitDesg InitDesg;
+struct InitDesg{
+    InitDesg *next;
+    int idx;
+    Obj  *var;
+};
+
 static void enter_scope(void){
     Scope *sc = calloc(1, sizeof(Scope));
     sc -> next = scope;
@@ -83,12 +101,6 @@ static char* get_ident(Token* tok){
         error_at(tok -> str, "expected an identifier\n");
     char* name = calloc(1, tok -> len + 1); // null終端するため。
     return strncpy(name, tok -> str, tok -> len);
-}
-
-static long get_number(Token *tok){
-    if(tok -> kind != TK_NUM)
-        error_at(tok -> str, "expected a number\n");
-    return tok -> val;
 }
 
 /* 名前で検索する。見つからなかった場合はNULLを返す。 */
@@ -214,6 +226,7 @@ static Node *expr_stmt(void);
 static Node* stmt(void);
 static Node* compound_stmt(void);
 static Node* declaration(Type *base);
+static Node *lvar_initializer(Obj *var);
 static int64_t const_expr(void);
 static Node* expr(void);
 static Node* assign(void);
@@ -933,10 +946,8 @@ static Node *declaration(Type *base){
         Obj *lvar = new_lvar(get_ident(ty -> name), ty);
         
         if(consume("=")){
-            Node *lhs = new_var_node(lvar);
-            Node *rhs = assign();
-            Node *node = new_binary(ND_ASSIGN, lhs, rhs);
-            cur = cur -> next  = new_unary(ND_EXPR_STMT, node);
+            Node *expr = lvar_initializer(lvar);
+            cur = cur -> next  = new_unary(ND_EXPR_STMT, expr);
         }
 
         if(consume(",")){
@@ -946,6 +957,64 @@ static Node *declaration(Type *base){
     Node *node = new_node(ND_BLOCK);
     node -> body = head.next;
     return node;
+}
+
+static Initializer *new_initializer(Type *ty){
+    Initializer *init = calloc(1, sizeof(Initializer));
+    init -> ty = ty;
+    if(ty -> kind == TY_ARRAY){
+        init -> children = calloc(ty -> array_len, sizeof(Initializer));
+        for(int i = 0; i < ty -> array_len; i++){
+            init -> children[i] = new_initializer(ty -> base);
+        }
+    }
+    return init;
+}
+
+/* initializer  = "{" initializer ("," initializer)* "}"
+                | assign */
+static void assign_initializer(Initializer *init){
+    if(init -> ty -> kind == TY_ARRAY){
+        expect("{");
+        for(int i = 0; i < init -> ty -> array_len; i++){
+            if(0 < i)
+                expect(",");
+            assign_initializer(init -> children[i]);
+        }
+        expect("}");
+        return;
+    }
+    init -> expr = assign();
+}
+
+static Node *create_target(InitDesg *desg){
+    if(desg -> var)
+        return new_var_node(desg -> var);
+    Node *lhs = create_target(desg -> next);
+    Node *rhs = new_num_node(desg -> idx);
+    return new_unary(ND_DEREF, new_add(lhs, rhs));
+}
+
+static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg){
+    if(ty -> kind == TY_ARRAY){
+        Node *node = new_node(ND_NULl_EXPR);
+        for(int i = 0; i < ty -> array_len; i++){
+            InitDesg desg2 = {desg, i};
+            Node *rhs = create_lvar_init(init -> children[i], ty -> base, &desg2);
+            node = new_binary(ND_COMMA, node, rhs);
+        }
+        return node;
+    }
+    Node *lhs = create_target(desg);
+    Node *rhs = init -> expr;
+    return new_binary(ND_ASSIGN, lhs, rhs);
+}   
+
+static Node *lvar_initializer(Obj *var){
+    Initializer *init = new_initializer(var -> ty);
+    assign_initializer(init);
+    InitDesg desg = {NULL, 0, var};
+    return create_lvar_init(init, var -> ty, &desg);
 }
 
 // 構文木を下りながら計算して値を返す 

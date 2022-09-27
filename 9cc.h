@@ -149,6 +149,7 @@ struct Obj{
 };
 
 typedef enum{
+    ND_NULl_EXPR, // do nothing
     ND_EXPR_STMT, // expression statement
     ND_STMT_EXPR, // [GNU] statement expression
     ND_ADD,

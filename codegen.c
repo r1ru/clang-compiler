@@ -153,6 +153,9 @@ static void cast(Type *from, Type *to){
 /* 式の評価結果はraxレジスタに格納される。 */
 static void gen_expr(Node* node){
     switch(node -> kind){
+        case ND_NULl_EXPR:
+            return;
+        
         case ND_NUM:
             fprintf(STREAM, "\tmov rax, %ld\n", node -> val); /* ND_NUMなら入力が一つの数値だったということ。*/
             return;
