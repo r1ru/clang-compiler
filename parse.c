@@ -53,7 +53,7 @@ typedef struct Initializer Initializer;
 struct Initializer{
     Initializer *next; // global variableに使う
     Type *ty;
-    Token *tok; // for error report
+    bool is_flexible;
     
     Node *expr;
 
@@ -938,8 +938,6 @@ static Node *declaration(Type *base){
     while(!consume(";")){
         Type* ty = declarator(base);
 
-        if(ty -> size < 0)
-             error_at(ty -> name -> str, "variable hs incomplete type");
         if(is_void(ty))
             error_at(ty -> name -> str, "variable declared void");
 
@@ -950,6 +948,9 @@ static Node *declaration(Type *base){
             cur = cur -> next  = new_unary(ND_EXPR_STMT, expr);
         }
 
+        if(lvar -> ty -> size < 0)
+             error_at(ty -> name -> str, "variable has incomplete type");
+
         if(consume(",")){
             continue;
         }
@@ -959,13 +960,18 @@ static Node *declaration(Type *base){
     return node;
 }
 
-static Initializer *new_initializer(Type *ty){
+static Initializer *new_initializer(Type *ty, bool is_flexible){
     Initializer *init = calloc(1, sizeof(Initializer));
     init -> ty = ty;
     if(ty -> kind == TY_ARRAY){
+        // 要素数の省略が許されるかつ要素数が指定されていない場合
+        if(is_flexible && ty -> size < 0){
+            init -> is_flexible = true;
+            return init;
+        }
         init -> children = calloc(ty -> array_len, sizeof(Initializer));
         for(int i = 0; i < ty -> array_len; i++){
-            init -> children[i] = new_initializer(ty -> base);
+            init -> children[i] = new_initializer(ty -> base, false);
         }
     }
     return init;
@@ -990,15 +996,39 @@ static void skip_excess_element(void){
 // stirng-intizlier = string-literal
 static void string_initializer(Initializer *init){
     int len = MIN(init -> ty -> array_len, token -> ty -> array_len);
+    // 要素数が指定されていない場合修正
+    if(init -> is_flexible)
+        *init = *new_initializer(array_of(ty_char, token -> ty -> array_len), false);
+    
     for(int i = 0; i < len; i++){
         init -> children[i] -> expr = new_num_node(token -> str[i]);
     }
     next_token();
 }
 
+static int count_array_init_elements(Type *ty){
+    Token * tok = token; // tokenを保存しておく。(assing_initializerはtokenを変更してしますため)
+    Initializer *dummy = new_initializer(ty -> base, false);
+    int i = 0;
+
+    for(;!consume("}"); i++){
+        if(0 < i)
+            expect(",");
+        assign_initializer(dummy);
+    }
+    token = tok;
+    return i;
+}
+
 // array-initializer = "{" initializer ("," initizlier )* "}"
 static void array_initializer(Initializer *init){
     expect("{");
+
+    if(init -> is_flexible){
+        int len = count_array_init_elements(init -> ty);
+        *init = *new_initializer(array_of(init -> ty -> base, len), false);
+    }
+
     for(int i = 0; !consume("}"); i++){
         if(0 < i)
             expect(",");
@@ -1051,8 +1081,10 @@ static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg){
 }   
 
 static Node *lvar_initializer(Obj *var){
-    Initializer *init = new_initializer(var -> ty);
+    Initializer *init = new_initializer(var -> ty, true);
     assign_initializer(init);
+    var -> ty = init -> ty; // 必要な場合型を修正
+
     InitDesg desg = {NULL, 0, var};
     
     // 先頭で配列を0クリアする
