@@ -971,17 +971,33 @@ static Initializer *new_initializer(Type *ty){
     return init;
 }
 
+// {が出てきたら}まで読み飛ばす。それ以外はassignを一つ読み飛ばす。
+static void skip_excess_element(void){
+    if(consume("{")){
+        for(int i = 0; !consume("}"); i++){
+            if(0 < i)
+                expect(",");
+            skip_excess_element();
+        }
+        return;
+    }
+    assign();
+}
+
 /* initializer  = "{" initializer ("," initializer)* "}"
                 | assign */
 static void assign_initializer(Initializer *init){
     if(init -> ty -> kind == TY_ARRAY){
         expect("{");
-        for(int i = 0; i < init -> ty -> array_len && !is_equal(token, "}"); i++){
+        for(int i = 0; !consume("}"); i++){
             if(0 < i)
                 expect(",");
-            assign_initializer(init -> children[i]);
+
+            if(i < init -> ty -> array_len)
+                assign_initializer(init -> children[i]);
+            else 
+                skip_excess_element();
         }
-        expect("}");
         return;
     }
     init -> expr = assign();
