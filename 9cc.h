@@ -119,7 +119,8 @@ struct Member{
     Member *next;
     Type *ty;
     Token *name;
-    int offset;    
+    int offset;
+    int idx; // 何番目のメンバか    
 };
 
 /* グローバル変数の初期値 */

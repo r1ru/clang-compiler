@@ -64,6 +64,7 @@ typedef struct InitDesg InitDesg;
 struct InitDesg{
     InitDesg *next;
     int idx;
+    Member *member; // struct
     Obj  *var;
 };
 
@@ -560,30 +561,22 @@ static Member *new_member(Token *name, Type *ty){
     return member;
 }
 
-
-/* decl = declspec declarator ( "," declarator)* ";" */
-static Member *decl(void){
-    Member head = {};
-    Member *cur = &head;
-    Type *base = declspec(NULL); // 構造体や共用体のメンバにtypedefはこれない
-    do{
-        Type *ty = declarator(base);
-        cur = cur -> next = new_member(ty -> name, ty);
-        if(!consume(",")){
-            break;
-        }
-    }while(!is_equal(token, ";"));
-    expect(";");
-    return head.next;
-}
-
-/* struct-members = decl ("," decl )* "}" */
+// struct-members = (declspec declarator ( "," declarator)* ";" )* "}"
 static Member *struct_members(void){
     Member head = {};
     Member *cur = &head;
-
+    int idx = 0;
     while(!consume("}")){
-        cur = cur -> next = decl();
+        Type *base = declspec(NULL);
+        bool is_first = true;
+        while(!consume(";")){
+             if(!is_first)
+                expect(",");
+            is_first = false;
+            Type *ty = declarator(base);
+            cur = cur -> next = new_member(ty -> name, ty);
+            cur -> idx = idx++;
+        }
     }
     return head.next;
 } 
@@ -974,6 +967,14 @@ static Initializer *new_initializer(Type *ty, bool is_flexible){
             init -> children[i] = new_initializer(ty -> base, false);
         }
     }
+    if(ty -> kind == TY_STRUCT){
+        int len = 0;
+        for(Member *mem = ty -> members; mem; mem = mem -> next)
+            len++;
+        init -> children = calloc(len, sizeof(Initializer*));
+        for(Member *mem = ty -> members; mem; mem = mem -> next)
+            init -> children[mem -> idx] = new_initializer(mem -> ty, false);
+    }
     return init;
 }
 
@@ -1040,7 +1041,24 @@ static void array_initializer(Initializer *init){
     }
 }
 
-// initializer  = stirng-initializer | array-initialzier | assign 
+// struct-initializer = "{" initializer ("," initializer)* "}"
+static void struct_intializer(Initializer *init){
+    expect("{");
+    Member *mem = init -> ty -> members;
+    while(!consume("}")){
+        if(mem != init -> ty -> members)
+            expect(",");
+        
+        if(mem){
+            assign_initializer(init -> children[mem -> idx]);
+            mem = mem -> next;
+        }else{
+            skip_excess_element();
+        }
+    }
+}
+
+// initializer  = stirng-initializer | array-initialzier | struct-initializer | assign 
 static void assign_initializer(Initializer *init){
     if(init -> ty -> kind == TY_ARRAY){
         if(token -> kind == TK_STR)
@@ -1049,12 +1067,23 @@ static void assign_initializer(Initializer *init){
             array_initializer(init);
         return;
     }
+
+    if(init -> ty -> kind == TY_STRUCT){
+        struct_intializer(init);
+        return;
+    }
+
     init -> expr = assign();
 }
 
 static Node *create_target(InitDesg *desg){
     if(desg -> var)
         return new_var_node(desg -> var);
+    if(desg -> member){
+        Node * node = new_unary(ND_MEMBER, create_target(desg -> next));
+        node -> member = desg -> member;
+        return node;
+    }
     Node *lhs = create_target(desg -> next);
     Node *rhs = new_num_node(desg -> idx);
     return new_unary(ND_DEREF, new_add(lhs, rhs));
@@ -1066,6 +1095,16 @@ static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg){
         for(int i = 0; i < ty -> array_len; i++){
             InitDesg desg2 = {desg, i};
             Node *rhs = create_lvar_init(init -> children[i], ty -> base, &desg2);
+            node = new_binary(ND_COMMA, node, rhs);
+        }
+        return node;
+    }
+
+    if(ty -> kind == TY_STRUCT){
+        Node *node = new_node(ND_NULL_EXPR);
+        for(Member *mem = ty -> members; mem; mem = mem -> next){
+            InitDesg desg2  = {desg, 0, mem};
+            Node *rhs = create_lvar_init(init -> children[mem -> idx], mem -> ty, &desg2);
             node = new_binary(ND_COMMA, node, rhs);
         }
         return node;
@@ -1085,7 +1124,7 @@ static Node *lvar_initializer(Obj *var){
     assign_initializer(init);
     var -> ty = init -> ty; // 必要な場合型を修正
 
-    InitDesg desg = {NULL, 0, var};
+    InitDesg desg = {NULL, 0, NULL, var};
     
     // 先頭で配列を0クリアする
     Node *lhs = new_node(ND_MEMZERO);
