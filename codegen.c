@@ -24,7 +24,7 @@ static int get_index(void){
 
 /* raxに入ってるアドレスにから値を読む。*/
 static void load(Type* ty){
-    if(ty -> kind == TY_ARRAY){
+    if(ty -> kind == TY_ARRAY || ty -> kind == TY_STRUCT || ty -> kind == TY_UNION){
         return;
     }
 
@@ -51,6 +51,14 @@ static void load(Type* ty){
 /* スタックに積まれているアドレスに値を格納。*/
 static void store(Type *ty){
     pop("rdi");
+    if(ty -> kind == TY_STRUCT || ty -> kind == TY_UNION){
+        // 1byteずつコピーする
+        for(int i = 0; i < ty -> size; i++){
+            fprintf(STREAM, "\tmov r8b, [rax + %d]\n", i);
+            fprintf(STREAM, "\tmov [rdi + %d], r8b\n", i);
+        }
+        return;
+    }
     switch (ty -> size){
         case 1:
             fprintf(STREAM, "\tmov [rdi], al\n");

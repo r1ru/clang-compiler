@@ -1069,6 +1069,14 @@ static void assign_initializer(Initializer *init){
     }
 
     if(init -> ty -> kind == TY_STRUCT){
+        if(!is_equal(token, "{")){
+            Node *expr = assign();
+            add_type(expr);
+            if(expr -> ty -> kind == TY_STRUCT){
+                init -> expr = expr;
+                return;
+            }
+        }
         struct_intializer(init);
         return;
     }
@@ -1100,7 +1108,7 @@ static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg){
         return node;
     }
 
-    if(ty -> kind == TY_STRUCT){
+    if(ty -> kind == TY_STRUCT && !init -> expr){
         Node *node = new_node(ND_NULL_EXPR);
         for(Member *mem = ty -> members; mem; mem = mem -> next){
             InitDesg desg2  = {desg, 0, mem};
