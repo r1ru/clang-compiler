@@ -967,7 +967,7 @@ static Initializer *new_initializer(Type *ty, bool is_flexible){
             init -> children[i] = new_initializer(ty -> base, false);
         }
     }
-    if(ty -> kind == TY_STRUCT){
+    if(ty -> kind == TY_STRUCT || ty -> kind == TY_UNION){
         int len = 0;
         for(Member *mem = ty -> members; mem; mem = mem -> next)
             len++;
@@ -1058,7 +1058,17 @@ static void struct_intializer(Initializer *init){
     }
 }
 
-// initializer  = stirng-initializer | array-initialzier | struct-initializer | assign 
+// union-initializer = "{" initializer "}"
+static void union_initializer(Initializer *init){
+    expect("{");
+    assign_initializer(init -> children[0]);
+    expect("}");
+}
+
+// initializer  = stirng-initializer
+//              | array-initialzier
+//              | struct-initializer | union-initializer
+//              | assign
 static void assign_initializer(Initializer *init){
     if(init -> ty -> kind == TY_ARRAY){
         if(token -> kind == TK_STR)
@@ -1078,6 +1088,11 @@ static void assign_initializer(Initializer *init){
             }
         }
         struct_intializer(init);
+        return;
+    }
+
+    if(init -> ty -> kind == TY_UNION){
+        union_initializer(init);
         return;
     }
 
@@ -1116,6 +1131,11 @@ static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg){
             node = new_binary(ND_COMMA, node, rhs);
         }
         return node;
+    }
+
+    if(ty -> kind == TY_UNION){
+        InitDesg desg2 = {desg, 0, ty -> members};
+        return create_lvar_init(init -> children[0], ty -> members -> ty, &desg2);
     }
 
     // 初期化式が明示されていなければ代入式を作る必要はない
