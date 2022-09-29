@@ -5,6 +5,11 @@ short g4 = 4;
 int g5 = 5;
 long g6 = 6;
 
+int g9[3] = {0, 1, 2};
+struct {char a; int b;} g11[2] = {{1, 2}, {3, 4}};
+struct {int a[2];} g12[2] = {{{1, 2}}};
+union { int a; char b[8]; } g13[2] = {{0x01020304}, {0x05060708}};
+
 int main() {
     ASSERT(1, ({ int x[3]={1,2,3}; x[0]; }));
     ASSERT(2, ({ int x[3]={1,2,3}; x[1]; }));
@@ -69,6 +74,25 @@ int main() {
     ASSERT(4, g4);
     ASSERT(5, g5);
     ASSERT(6, g6);
+
+    ASSERT(0, g9[0]);
+    ASSERT(1, g9[1]);
+    ASSERT(2, g9[2]);
+
+    ASSERT(1, g11[0].a);
+    ASSERT(2, g11[0].b);
+    ASSERT(3, g11[1].a);
+    ASSERT(4, g11[1].b);
+
+    ASSERT(1, g12[0].a[0]);
+    ASSERT(2, g12[0].a[1]);
+    ASSERT(0, g12[1].a[0]);
+    ASSERT(0, g12[1].a[1]);
+
+    ASSERT(4, g13[0].b[0]);
+    ASSERT(3, g13[0].b[1]);
+    ASSERT(8, g13[1].b[0]);
+    ASSERT(7, g13[1].b[1]);
 
     printf("OK\n");
     return 0;
