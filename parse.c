@@ -227,6 +227,8 @@ static Node* compound_stmt(void);
 static Node* declaration(Type *base);
 static void assign_initializer(Initializer *init);
 static Node *lvar_initializer(Obj *var);
+static void gvar_initialzier(Obj *var);
+static int64_t eval(Node *node);
 static int64_t const_expr(void);
 static Node* expr(void);
 static Node* assign(void);
@@ -315,6 +317,7 @@ static void function(Type *base, VarAttr *attr){
     resolve_goto_labels();
 }
 
+// global_variable = declarator ( "=" global-initialzier )? ("," declarator ("=" global-initialzier )? )* 
 static void global_variable(Type *base){
     bool is_first = true;
     while(!consume(";")){
@@ -322,7 +325,9 @@ static void global_variable(Type *base){
             expect(",");
         is_first = false;
         Type *ty = declarator(base);
-        new_gvar(get_ident(ty -> name), ty);
+        Obj *var = new_gvar(get_ident(ty -> name), ty);
+        if(consume("="))
+            gvar_initialzier(var);
     }
 }
 
@@ -938,7 +943,7 @@ static Type *typename(void){
     return abstract_declarator(base);
 }
 
-/* declspec declarator ("=" assign)? ("," declarator ("=" assign)?)* ";" */
+/* declspec declarator ("=" lvar-initalizer)? ("," declarator ("=" lvar-intializer)?)* ";" */
 static Node *declaration(Type *base){
     Node head = {};
     Node *cur = &head;
@@ -1159,12 +1164,18 @@ static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg){
     // 初期化式が指定されていれば代入式を作る
     Node *lhs = create_target(desg);
     return new_binary(ND_ASSIGN, lhs, init -> expr);
-}   
+}
 
-static Node *lvar_initializer(Obj *var){
+// ローカル変数、グローバル変数共用
+static Initializer *initializer(Obj *var){
     Initializer *init = new_initializer(var -> ty, true);
     assign_initializer(init);
-    var -> ty = init -> ty; // 必要な場合型を修正
+    var -> ty = init -> ty;
+    return init;
+}
+
+static Node *lvar_initializer(Obj *var){
+    Initializer *init = initializer(var);
 
     InitDesg desg = {NULL, 0, NULL, var};
     
@@ -1174,6 +1185,39 @@ static Node *lvar_initializer(Obj *var){
     
     Node *rhs = create_lvar_init(init, var -> ty, &desg);
     return new_binary(ND_COMMA, lhs, rhs);
+}
+
+static void write_buf(char *buf, int64_t val, int size){
+    if(size == 1){
+        *buf = val;
+    }else if(size == 2){
+        *(int16_t*)buf = val;
+    }else if(size == 4){
+        *(int32_t*)buf = val;
+    }else if(size == 8){
+        *(int64_t*)buf = val;
+    }else{
+        assert(0); // unreachable
+    }
+}
+
+static void write_gvar_data(Initializer *init, Type *ty, char *buf, int offset){
+    if(ty -> kind == TY_ARRAY){
+        int size = ty -> base -> size;
+        for(int i = 0; i < ty -> array_len; i++)
+            write_gvar_data(init -> children[i], ty -> base, buf, offset + size * i);
+        return;
+    }
+    
+    if(init -> expr)
+        write_buf(buf + offset, eval(init -> expr), ty -> size);
+}
+
+static void gvar_initialzier(Obj *var){
+    Initializer *init = initializer(var);
+    char *buf = calloc(1, var -> ty -> size);
+    write_gvar_data(init, var -> ty, buf, 0);
+    var -> init_data = buf;
 }
 
 // 構文木を下りながら計算して値を返す 
