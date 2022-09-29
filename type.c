@@ -157,7 +157,8 @@ void add_type(Node *node) {
         case ND_ADDR:
             if(node -> lhs -> ty -> kind == TY_ARRAY)
                 node -> ty = pointer_to(node -> lhs -> ty -> base);
-            node -> ty = pointer_to(node -> lhs -> ty);
+            else 
+                node -> ty = pointer_to(node -> lhs -> ty);
             return;
         case ND_DEREF:
             if (!node-> lhs -> ty -> base) //pointer型でなけれなエラー

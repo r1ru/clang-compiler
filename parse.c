@@ -228,7 +228,7 @@ static Node* declaration(Type *base);
 static void assign_initializer(Initializer *init);
 static Node *lvar_initializer(Obj *var);
 static void gvar_initialzier(Obj *var);
-static int64_t eval(Node *node);
+static int64_t eval(Node *node, char **label);
 static int64_t const_expr(void);
 static Node* expr(void);
 static Node* assign(void);
@@ -1202,95 +1202,143 @@ static void write_buf(char *buf, int64_t val, int size){
     }
 }
 
-static void write_gvar_data(Initializer *init, Type *ty, char *buf, int offset){
+static Relocation *write_gvar_data(Relocation *cur, Initializer *init, Type *ty, char *buf, int offset){
     if(ty -> kind == TY_ARRAY){
         int size = ty -> base -> size;
         for(int i = 0; i < ty -> array_len; i++)
-            write_gvar_data(init -> children[i], ty -> base, buf, offset + size * i);
-        return;
+            cur = write_gvar_data(cur, init -> children[i], ty -> base, buf, offset + size * i);
+        return cur;
     }
 
     if(ty -> kind == TY_STRUCT){
         for(Member *mem = ty -> members; mem; mem = mem -> next)
-            write_gvar_data(init -> children[mem -> idx], mem -> ty, buf, offset + mem -> offset);
-        return;
+            cur = write_gvar_data(cur, init -> children[mem -> idx], mem -> ty, buf, offset + mem -> offset);
+        return cur;
     }
 
     if(ty -> kind == TY_UNION){
-        write_gvar_data(init -> children[0], ty -> members -> ty, buf, offset);
-        return;
+        return write_gvar_data(cur, init -> children[0], ty -> members -> ty, buf, offset);
     }
     
-    if(init -> expr)
-        write_buf(buf + offset, eval(init -> expr), ty -> size);
+    if(!init -> expr)
+        return cur;
+    
+    char *label = NULL;
+    int64_t val = eval(init -> expr, &label);
+
+    if(!label){
+        write_buf(buf + offset, val, ty -> size);
+        return cur;
+    }
+
+    Relocation *rel = calloc(1, sizeof(Relocation));
+    rel -> offset = offset;
+    rel -> label = label;
+    rel -> addend = val;
+    cur -> next = rel;
+    return cur -> next;
 }
 
 static void gvar_initialzier(Obj *var){
+    Relocation head = {};
     Initializer *init = initializer(var);
     char *buf = calloc(1, var -> ty -> size);
-    write_gvar_data(init, var -> ty, buf, 0);
+    write_gvar_data(&head, init, var -> ty, buf, 0);
     var -> init_data = buf;
+    var -> rel = head.next;
+}
+
+static int64_t eval_rval(Node *node, char** label){
+    switch(node -> kind){
+        case ND_VAR:
+            if(!node -> var -> is_global)
+                error("not a compile-time constant");
+            *label = node -> var -> name;
+            return 0;
+        case ND_DEREF:
+            return eval(node -> lhs, label);
+        case ND_MEMBER:
+            return eval_rval(node -> lhs, label) + node -> member -> offset;
+    }
+    error("invalid initializer");
 }
 
 // 構文木を下りながら計算して値を返す 
-static int64_t eval(Node *node){
+static int64_t eval(Node *node, char** label){
     add_type(node);
 
     switch(node -> kind){
         case ND_ADD:
-            return eval(node -> lhs) + eval(node -> rhs);
+            return eval(node -> lhs, label) + eval(node -> rhs, NULL);
         case ND_SUB:
-            return eval(node -> lhs) - eval(node -> rhs);
+            return eval(node -> lhs, label) - eval(node -> rhs, NULL);
         case ND_MUL:
-            return eval(node -> lhs) * eval(node -> rhs);
+            return eval(node -> lhs, NULL) * eval(node -> rhs, NULL);
         case ND_DIV:
-            return eval(node -> lhs) / eval(node -> rhs);
+            return eval(node -> lhs, NULL) / eval(node -> rhs, NULL);
         case ND_MOD:
-            return eval(node -> lhs) % eval(node -> rhs);
+            return eval(node -> lhs, NULL) % eval(node -> rhs, NULL);
         case ND_EQ:
-            return eval(node -> lhs) == eval(node -> rhs);
+            return eval(node -> lhs, NULL) == eval(node -> rhs, NULL);
         case ND_NE:
-            return eval(node -> lhs) != eval(node -> rhs);
+            return eval(node -> lhs, NULL) != eval(node -> rhs, NULL);
         case ND_LT:
-            return eval(node -> lhs) < eval(node -> rhs);
+            return eval(node -> lhs, NULL) < eval(node -> rhs, NULL);
         case ND_LE:
-            return eval(node -> lhs) <= eval(node -> rhs);
+            return eval(node -> lhs, NULL) <= eval(node -> rhs, NULL);
         case ND_NEG:
-            return -eval(node -> lhs);
+            return -eval(node -> lhs, NULL);
         case ND_COND:
-            return eval(node -> cond) ? eval(node -> then) : eval(node -> els);
+            return eval(node -> cond, NULL) ? eval(node -> then, label) : eval(node -> els, label);
         case ND_NOT:
-            return !eval(node -> lhs);
+            return !eval(node -> lhs, NULL);
         case ND_BITNOT:
-            return ~eval(node -> lhs);
+            return ~eval(node -> lhs, NULL);
         case ND_BITOR:
-            return eval(node -> lhs) | eval(node -> rhs);
+            return eval(node -> lhs, NULL) | eval(node -> rhs, NULL);
         case ND_BITXOR:
-            return eval(node -> lhs) ^ eval(node -> rhs);
+            return eval(node -> lhs, NULL) ^ eval(node -> rhs, NULL);
         case ND_BITAND: 
-            return eval(node -> lhs) & eval(node -> rhs);
+            return eval(node -> lhs, NULL) & eval(node -> rhs, NULL);
         case ND_SHL:
-            return eval(node -> lhs) << eval(node -> rhs);
+            return eval(node -> lhs, NULL) << eval(node -> rhs, NULL);
         case ND_SHR:
-            return eval(node -> lhs) >> eval(node -> rhs);
+            return eval(node -> lhs, NULL) >> eval(node -> rhs, NULL);
         case ND_LOGAND:
-            return eval(node -> lhs) && eval(node -> rhs);
+            return eval(node -> lhs, NULL) && eval(node -> rhs, NULL);
         case ND_LOGOR:
-            return eval(node -> lhs) || eval(node -> rhs);
+            return eval(node -> lhs, NULL) || eval(node -> rhs, NULL);
         case ND_COMMA:
-            return eval(node -> rhs);
-        case ND_CAST:
+            return eval(node -> rhs, label);
+        case ND_CAST:{
+            int64_t val = eval(node -> lhs, label);
             if(is_integer(node -> ty)){
                 switch(node -> ty -> size){
                     case 1:
-                        return (int8_t)eval(node  -> lhs);
+                        return (int8_t)val;
                     case 2:
-                        return (int16_t)eval(node -> lhs);
+                        return (int16_t)val;
                     case 4:
-                        return (int32_t)eval(node -> lhs);
+                        return (int32_t)val;
                 }
             }
-            return eval(node -> lhs);
+            return val;
+        }
+        case ND_ADDR:
+            return eval_rval(node -> lhs, label);
+        case ND_MEMBER:
+            if(!label)
+                error("not a compile-time constant");
+            if(node -> ty -> kind != TY_ARRAY)
+                error("invalid initializer");
+            return eval_rval(node -> lhs, label) + node -> member -> offset;
+        case ND_VAR:
+            if(!label)
+                error("not a compile-time constant");
+            if(node -> var -> ty -> kind != TY_ARRAY && node -> var -> ty -> kind != TY_FUNC)
+                error("invalid initializer");
+            *label = node -> var -> name;
+            return 0;
         case ND_NUM:
             return node -> val;
     }  
@@ -1300,7 +1348,7 @@ static int64_t eval(Node *node){
 // const-expr = conditional
 static int64_t const_expr(void){
     Node* node = conditional();
-    return eval(node);
+    return eval(node, NULL);
 }
 
 /* expr = assign ("," expr)? */

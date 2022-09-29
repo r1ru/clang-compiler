@@ -500,8 +500,18 @@ static void emit_data(Obj *globals){
         fprintf(STREAM, "%s:\n", gvar -> name); 
         
         if(gvar -> init_data){
-            for(int i = 0; i < gvar -> ty -> size; i++)
-                fprintf(STREAM, "\t.byte %d\n", gvar -> init_data[i]);
+            int pos = 0;
+            Relocation *rel = gvar -> rel;
+            while(pos < gvar -> ty -> size){
+                // offset == posは、.byteを使っているために必要なチェック。
+                if(rel && rel -> offset == pos){
+                    fprintf(STREAM, "\t.quad %s + %ld\n", rel -> label, rel -> addend);
+                    rel = rel -> next;
+                    pos += 8;
+                }else{
+                    fprintf(STREAM, "\t.byte %d\n", gvar -> init_data[pos++]);
+                }
+            }
         }else{
             fprintf(STREAM, "\t.zero %d\n", gvar -> ty -> size);
         }

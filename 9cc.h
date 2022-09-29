@@ -123,6 +123,14 @@ struct Member{
     int idx; // 何番目のメンバか    
 };
 
+typedef struct Relocation Relocation;
+struct Relocation{
+    Relocation *next;
+    int offset;
+    char *label;
+    int64_t addend;
+};
+
 typedef struct Obj Obj;
 
 struct Obj{
@@ -134,6 +142,7 @@ struct Obj{
     // global variable
     bool is_global;
     char *init_data;
+    Relocation *rel;
 
     //function
     bool is_definition;
