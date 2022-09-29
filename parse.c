@@ -1015,10 +1015,11 @@ static void skip_excess_element(void){
 
 // stirng-intizlier = string-literal
 static void string_initializer(Initializer *init){
-    int len = MIN(init -> ty -> array_len, token -> ty -> array_len);
     // 要素数が指定されていない場合修正
     if(init -> is_flexible)
         *init = *new_initializer(array_of(ty_char, token -> ty -> array_len), false);
+    
+    int len = MIN(init -> ty -> array_len, token -> ty -> array_len);
     
     for(int i = 0; i < len; i++){
         init -> children[i] -> expr = new_num_node(token -> str[i]);
