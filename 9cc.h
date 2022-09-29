@@ -123,14 +123,6 @@ struct Member{
     int idx; // 何番目のメンバか    
 };
 
-/* グローバル変数の初期値 */
-typedef struct InitData InitData;
-struct InitData{
-    InitData *next;
-    int64_t val;
-    char *label;
-};
-
 typedef struct Obj Obj;
 
 struct Obj{
@@ -141,8 +133,7 @@ struct Obj{
 
     // global variable
     bool is_global;
-    char *str; // stirng literal or global char array
-    InitData *init_data;
+    char *init_data;
 
     //function
     bool is_definition;

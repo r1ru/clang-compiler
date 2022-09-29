@@ -174,7 +174,7 @@ static char* new_unique_name(void){
 
 static Obj *new_string_literal(Token *tok){
     Obj *strl = new_gvar(new_unique_name(), tok -> ty);
-    strl -> str = tok -> str;
+    strl -> init_data = tok -> str;
     return strl;
 }
 
@@ -221,7 +221,6 @@ static Type* type_suffix(Type *ty);
 static Type *array_dementions(Type *ty);
 static Type* declarator(Type *ty);
 static Type *abstract_declarator(Type *ty);
-static void function(Type *ty, VarAttr *attr);
 static Node *expr_stmt(void);
 static Node* stmt(void);
 static Node* compound_stmt(void);
@@ -260,35 +259,15 @@ static void parse_typedef(Type *base){
     expect(";");
 }
 
-/* program = (function-definition | global-variable)* */
-Obj * parse(void){
-    globals = NULL;
-    while(!at_eof()){
-        VarAttr attr = {};
-        Type *base = declspec(&attr);
-
-        if(attr.is_typedef){
-            parse_typedef(base);
-            continue;
-        }
-
-        Type *ty = declarator(base);
-        if(is_func(ty)){
-            function(ty, &attr);
-        }
-        else{
-            new_gvar(get_ident(ty -> name), ty);
-            while(!is_equal(token, ";")){
-                if(!consume(",")){
-                    break;
-                }
-                ty = declarator(base);
-                new_gvar(get_ident(ty -> name), ty);
-            }
-            expect(";");
-        }
-    }
-    return globals;
+// tokenを先読みして関数かどうか調べる
+static bool is_function(void){
+    if(is_equal(token, ";"))
+        return false;
+    Token *tok = token;
+    Type dummy = {};
+    Type *ty = declarator(&dummy);
+    token = tok;
+    return ty -> kind == TY_FUNC;
 }
 
 /* ty->paramsは arg1->arg2->arg3 ...のようになっている。これを素直に前からnew_lvarを読んでいくと、localsは arg3->arg2->arg1という風になる。関数の先頭では渡されたパラメータを退避する必要があり、そのためにはlocalsをarg1->arg2->arg3のようにしたい。そこでty->paramsの最後の要素から生成している。*/
@@ -313,8 +292,10 @@ static void resolve_goto_labels(void){
     gotos = labels = NULL;
 }
 
-/* function = ";" | "{" compound_stmt */
-static void function(Type *ty, VarAttr *attr){
+// function = declarator ( ";" | "{" compound_stmt)
+static void function(Type *base, VarAttr *attr){
+    Type *ty = declarator(base);
+
     Obj* func = new_gvar(get_ident(ty -> name), ty);
     func -> is_definition = !consume(";");
     func -> is_static = attr -> is_static;
@@ -332,6 +313,39 @@ static void function(Type *ty, VarAttr *attr){
     func-> locals = locals;
     leave_scope();
     resolve_goto_labels();
+}
+
+static void global_variable(Type *base){
+    bool is_first = true;
+    while(!consume(";")){
+        if(!is_first)
+            expect(",");
+        is_first = false;
+        Type *ty = declarator(base);
+        new_gvar(get_ident(ty -> name), ty);
+    }
+}
+
+/* program = (function-definition | global-variable)* */
+Obj * parse(void){
+    globals = NULL;
+    while(!at_eof()){
+        VarAttr attr = {};
+        Type *base = declspec(&attr);
+
+        if(attr.is_typedef){
+            parse_typedef(base);
+            continue;
+        }
+        
+        if(is_function()){
+            function(base, &attr);
+            continue;
+        }
+        
+        global_variable(base);
+    }
+    return globals;
 }
 
 /* expr-stmt = expr? ";" */

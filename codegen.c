@@ -493,44 +493,18 @@ static void assign_lvar_offsets(Obj *globals){
 static void emit_data(Obj *globals){
     fprintf(STREAM, ".data\n");
     for(Obj *gvar = globals; gvar; gvar = gvar -> next){
-        int remain = gvar -> ty -> size;
-        int base_size = is_array(gvar -> ty) ? gvar -> ty -> base -> size : gvar -> ty -> size;
         if(is_func(gvar -> ty)){
             continue;
         }
         fprintf(STREAM, ".global %s\n", gvar -> name);
         fprintf(STREAM, "%s:\n", gvar -> name); 
         
-        if(is_array(gvar -> ty) && gvar -> str){
-            for(int i = 0; i < gvar -> ty -> array_len; i++){
-                fprintf(STREAM, "\t.byte %d\n", gvar -> str[i]);
-            }
-            continue;
+        if(gvar -> init_data){
+            for(int i = 0; i < gvar -> ty -> size; i++)
+                fprintf(STREAM, "\t.byte %d\n", gvar -> init_data[i]);
+        }else{
+            fprintf(STREAM, "\t.zero %d\n", gvar -> ty -> size);
         }
-        
-        /* 配列か普通の変数 */
-        for(InitData *data = gvar -> init_data; data; data = data -> next){
-            if(!data -> label){
-                if(base_size == 8){
-                    fprintf(STREAM, "\t.quad %ld\n", data -> val);
-                }else if(base_size == 4){
-                    fprintf(STREAM, "\t.long %ld\n", data -> val);
-                }else{
-                    fprintf(STREAM, "\t.byte %ld\n", data -> val);
-                }
-            }else{
-                if(base_size == 8){
-                    fprintf(STREAM, "\t.quad %s+%ld\n", data -> label, data -> val);
-                }else if(base_size == 4){
-                    fprintf(STREAM, "\t.long %s+%ld\n", data -> label, data -> val);
-                }else{
-                    fprintf(STREAM, "\t.byte %s+%ld\n", data -> label, data -> val);
-                }
-            }
-            remain -= base_size;
-        }
-        if(remain != 0)
-            fprintf(STREAM, "\t.zero %d\n", remain);
     }
 }
 
