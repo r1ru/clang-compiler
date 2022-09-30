@@ -1158,6 +1158,12 @@ static void assign_initializer(Initializer *init){
         return;
     }
 
+    if(consume("{")){
+        assign_initializer(init); // init -> expr = assign()じゃだめなのか?
+        expect("}");
+        return;
+    }
+
     init -> expr = assign();
 }
 
