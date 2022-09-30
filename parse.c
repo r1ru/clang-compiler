@@ -1041,8 +1041,8 @@ static int count_array_init_elements(Type *ty){
     return i;
 }
 
-// array-initializer = "{" initializer ("," initizlier )* "}"
-static void array_initializer(Initializer *init){
+// array-initializer1 = "{" initializer ("," initizlier )* "}"
+static void array_initializer1(Initializer *init){
     expect("{");
 
     if(init -> is_flexible){
@@ -1061,8 +1061,23 @@ static void array_initializer(Initializer *init){
     }
 }
 
-// struct-initializer = "{" initializer ("," initializer)* "}"
-static void struct_intializer(Initializer *init){
+// array-initializer2 = initializer ("," initizlier )*
+static void array_initializer2(Initializer *init){
+
+    if(init -> is_flexible){
+        int len = count_array_init_elements(init -> ty);
+        *init = *new_initializer(array_of(init -> ty -> base, len), false);
+    }
+
+    for(int i = 0; i < init -> ty -> array_len && !is_equal(token, "}"); i++){
+        if(0 < i)
+            expect(",");
+        assign_initializer(init -> children[i]);
+    }
+}
+
+// struct-initializer1 = "{" initializer ("," initializer)*
+static void struct_intializer1(Initializer *init){
     expect("{");
     Member *mem = init -> ty -> members;
     while(!consume("}")){
@@ -1078,11 +1093,25 @@ static void struct_intializer(Initializer *init){
     }
 }
 
-// union-initializer = "{" initializer "}"
+// struct-initializer2 = initializer ("," initializer)* 
+static void struct_intializer2(Initializer *init){
+    bool is_first = true;
+    for(Member *mem = init -> ty -> members; mem && !is_equal(token, "}"); mem = mem -> next){
+        if(!is_first)
+            expect(",");
+        is_first = false;
+        assign_initializer(init -> children[mem -> idx]);
+    }
+}
+
+// union-initializer = "{" initializer "} | initializer"
 static void union_initializer(Initializer *init){
-    expect("{");
+    if(consume("{")){
+        assign_initializer(init -> children[0]);
+        expect("}");
+        return;
+    }
     assign_initializer(init -> children[0]);
-    expect("}");
 }
 
 // initializer  = stirng-initializer
@@ -1090,24 +1119,37 @@ static void union_initializer(Initializer *init){
 //              | struct-initializer | union-initializer
 //              | assign
 static void assign_initializer(Initializer *init){
+    if(init -> ty -> kind == TY_ARRAY && token -> kind == TK_STR){
+        string_initializer(init);
+        return;
+    }
+
     if(init -> ty -> kind == TY_ARRAY){
-        if(token -> kind == TK_STR)
-            string_initializer(init);
+        if(is_equal(token, "{"))
+            array_initializer1(init);
         else 
-            array_initializer(init);
+            array_initializer2(init);
         return;
     }
 
     if(init -> ty -> kind == TY_STRUCT){
+        if(is_equal(token, "{")){
+            struct_intializer1(init);
+            return;
+        }
+
         if(!is_equal(token, "{")){
+            Token *tok = token;
             Node *expr = assign();
             add_type(expr);
             if(expr -> ty -> kind == TY_STRUCT){
                 init -> expr = expr;
                 return;
             }
+            token = tok;
         }
-        struct_intializer(init);
+
+        struct_intializer2(init); // {が省略された構造体の初期化式
         return;
     }
 
