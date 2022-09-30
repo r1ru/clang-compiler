@@ -681,9 +681,22 @@ static Type *union_decl(void){
     return ty;
 }
 
+static bool consume_end(void){
+    if(consume("}"))
+        return true;
+    if(is_equal(token, ",") && is_equal(token -> next, "}")){
+        token = token -> next -> next;
+        return true;
+    }
+}
+
+static bool is_end(void){
+    return is_equal(token, "}") || (is_equal(token, ",") && is_equal(token -> next, "}"));
+}
+
 /*  enum-specifier   = ident? "{" enum-list? "}"
                     | ident
-    enum-list       = enumerator ("," enumerator)*
+    enum-list       = enumerator ("," enumerator)* ","?
     enumerator      = ident ( "=" const-expression )? */
 static Type *enum_specifier(void){
     Token *tag = NULL;
@@ -706,7 +719,7 @@ static Type *enum_specifier(void){
     expect("{");
 
     int64_t val = 0;
-    while(!consume("}")){
+    while(!consume_end()){
         char *name = get_ident(token);
         next_token();
         if(consume("=")){
@@ -1032,7 +1045,7 @@ static int count_array_init_elements(Type *ty){
     Initializer *dummy = new_initializer(ty -> base, false);
     int i = 0;
 
-    for(;!consume("}"); i++){
+    for(;!consume_end(); i++){
         if(0 < i)
             expect(",");
         assign_initializer(dummy);
@@ -1041,7 +1054,7 @@ static int count_array_init_elements(Type *ty){
     return i;
 }
 
-// array-initializer1 = "{" initializer ("," initizlier )* "}"
+// array-initializer1 = "{" initializer ("," initizlier )* ","? }"
 static void array_initializer1(Initializer *init){
     expect("{");
 
@@ -1050,7 +1063,7 @@ static void array_initializer1(Initializer *init){
         *init = *new_initializer(array_of(init -> ty -> base, len), false);
     }
 
-    for(int i = 0; !consume("}"); i++){
+    for(int i = 0; !consume_end(); i++){
         if(0 < i)
             expect(",");
 
@@ -1069,18 +1082,18 @@ static void array_initializer2(Initializer *init){
         *init = *new_initializer(array_of(init -> ty -> base, len), false);
     }
 
-    for(int i = 0; i < init -> ty -> array_len && !is_equal(token, "}"); i++){
+    for(int i = 0; i < init -> ty -> array_len && !is_end(); i++){
         if(0 < i)
             expect(",");
         assign_initializer(init -> children[i]);
     }
 }
 
-// struct-initializer1 = "{" initializer ("," initializer)*
+// struct-initializer1 = "{" initializer ("," initializer)* ","? "}"
 static void struct_intializer1(Initializer *init){
     expect("{");
     Member *mem = init -> ty -> members;
-    while(!consume("}")){
+    while(!consume_end()){
         if(mem != init -> ty -> members)
             expect(",");
         
@@ -1096,7 +1109,7 @@ static void struct_intializer1(Initializer *init){
 // struct-initializer2 = initializer ("," initializer)* 
 static void struct_intializer2(Initializer *init){
     bool is_first = true;
-    for(Member *mem = init -> ty -> members; mem && !is_equal(token, "}"); mem = mem -> next){
+    for(Member *mem = init -> ty -> members; mem && !is_end(); mem = mem -> next){
         if(!is_first)
             expect(",");
         is_first = false;
@@ -1104,10 +1117,11 @@ static void struct_intializer2(Initializer *init){
     }
 }
 
-// union-initializer = "{" initializer "} | initializer"
+// union-initializer = "{" initializer ","? "}" | initializer"
 static void union_initializer(Initializer *init){
     if(consume("{")){
         assign_initializer(init -> children[0]);
+        consume(",");
         expect("}");
         return;
     }
