@@ -581,7 +581,7 @@ static Member *new_member(Token *name, Type *ty){
 }
 
 // struct-members = (declspec declarator ( "," declarator)* ";" )* "}"
-static Member *struct_members(void){
+static void struct_members(Type *ty){
     Member head = {};
     Member *cur = &head;
     int idx = 0;
@@ -603,9 +603,10 @@ static Member *struct_members(void){
     // struct {int x[];} x;のような入力も通ってしまう。
     if(cur != &head && cur -> ty -> kind == TY_ARRAY && cur -> ty -> array_len < 0){
         cur -> ty = array_of(cur -> ty -> base, 0);
+        ty -> is_flexible = true; // fleble array memeberを持っていることを記録
     }
 
-    return head.next;
+    ty -> members = head.next;
 } 
 
 /* struct-decl = ident? ("{" struct-members)? */
@@ -629,8 +630,7 @@ static Type *struct_union_decl(void){
 
     expect("{");
     Type *ty = struct_type();
-    ty -> members = struct_members();
-    ty -> align = 1; 
+    struct_members(ty);
 
     if(tag){
         /* 現在のスコープに同名のタグがある場合。不完全型なので上書き */
@@ -1012,8 +1012,16 @@ static Initializer *new_initializer(Type *ty, bool is_flexible){
         for(Member *mem = ty -> members; mem; mem = mem -> next)
             len++;
         init -> children = calloc(len, sizeof(Initializer*));
-        for(Member *mem = ty -> members; mem; mem = mem -> next)
-            init -> children[mem -> idx] = new_initializer(mem -> ty, false);
+        for(Member *mem = ty -> members; mem; mem = mem -> next){
+            if(is_flexible && ty -> is_flexible){
+                Initializer *child = calloc(1, sizeof(Initializer));
+                child -> ty = mem -> ty;
+                child -> is_flexible = true;
+                init -> children[mem -> idx] = child;
+            }else{
+                init -> children[mem -> idx] = new_initializer(mem -> ty, false);
+            }
+        }
     }
     return init;
 }
@@ -1098,7 +1106,7 @@ static void array_initializer2(Initializer *init){
 }
 
 // struct-initializer1 = "{" initializer ("," initializer)* ","? "}"
-static void struct_intializer1(Initializer *init){
+static void struct_initializer1(Initializer *init){
     expect("{");
     Member *mem = init -> ty -> members;
     while(!consume_end()){
@@ -1115,7 +1123,7 @@ static void struct_intializer1(Initializer *init){
 }
 
 // struct-initializer2 = initializer ("," initializer)* 
-static void struct_intializer2(Initializer *init){
+static void struct_initializer2(Initializer *init){
     bool is_first = true;
     for(Member *mem = init -> ty -> members; mem && !is_end(); mem = mem -> next){
         if(!is_first)
@@ -1156,7 +1164,7 @@ static void assign_initializer(Initializer *init){
 
     if(init -> ty -> kind == TY_STRUCT){
         if(is_equal(token, "{")){
-            struct_intializer1(init);
+            struct_initializer1(init);
             return;
         }
 
@@ -1171,7 +1179,7 @@ static void assign_initializer(Initializer *init){
             token = tok;
         }
 
-        struct_intializer2(init); // {が省略された構造体の初期化式
+        struct_initializer2(init); // {が省略された構造体の初期化式
         return;
     }
 
@@ -1237,10 +1245,35 @@ static Node *create_lvar_init(Initializer *init, Type *ty, InitDesg *desg){
     return new_binary(ND_ASSIGN, lhs, init -> expr);
 }
 
+static Type *copy_struct_type(Type *ty){
+    ty = copy_type(ty); // copyは必須。元の型情報を残して置く必要があるため。
+    Member head = {};
+    Member *cur = &head;
+    for(Member *mem = ty -> members; mem; mem = mem -> next){
+        Member *m = calloc(1, sizeof(Member));
+        *m = *mem;
+        cur = cur -> next = m;
+    }
+    ty -> members = head.next;
+    return ty;
+}
+
 // ローカル変数、グローバル変数共用
 static Initializer *initializer(Obj *var){
     Initializer *init = new_initializer(var -> ty, true);
     assign_initializer(init);
+
+    // flexible array memberを持っている場合、var -> tyを修正する。
+    if((var -> ty -> kind == TY_STRUCT || var -> ty -> kind == TY_UNION) && var -> ty -> is_flexible){
+        var -> ty = copy_struct_type(var -> ty);
+        Member *mem = var -> ty -> members;
+        while(mem -> next)
+            mem = mem -> next; // flexible array memberまで移動
+        mem -> ty = init -> children[mem -> idx] -> ty;
+        var -> ty -> size += mem -> ty -> size;
+        return init;
+    }
+
     var -> ty = init -> ty;
     return init;
 }

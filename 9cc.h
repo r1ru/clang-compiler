@@ -83,6 +83,7 @@ struct Type{
 
     /* struct members */
     Member *members;
+    bool is_flexible; // flexible array member or not
 
     /* function type */
     Type *ret_ty;
