@@ -89,7 +89,7 @@ static void gen_addr(Node *node) {
                 return;
             }
             else{
-                fprintf(STREAM, "\tlea rax, [rbp -%d]\n", node -> var -> offset);
+                fprintf(STREAM, "\tlea rax, [rbp + %d]\n", node -> var -> offset);
                 return;
             }
         case ND_DEREF:
@@ -238,7 +238,7 @@ static void gen_expr(Node* node){
         case ND_MEMZERO:
             // rep stosb 命令はmemset(rdi, al, rcx)と同じ
             fprintf(STREAM, "\tmov rcx, %d\n", node -> var -> ty -> size);
-            fprintf(STREAM, "\tlea rdi, [rbp - %d]\n", node -> var -> offset);
+            fprintf(STREAM, "\tlea rdi, [rbp + %d]\n", node -> var -> offset);
             fprintf(STREAM, "\tmov eax, 0\n");
             fprintf(STREAM, "\trep stosb\n");
             return;
@@ -454,19 +454,19 @@ static void gen_stmt(Node* node){
 static void store_arg(int i, int offset, unsigned int size){
     switch(size){
         case 1:
-            fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg8[i]);
+            fprintf(STREAM, "\tmov [rbp + %d], %s\n", offset, argreg8[i]);
             return;
         
         case 2:
-            fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg16[i]);
+            fprintf(STREAM, "\tmov [rbp + %d], %s\n", offset, argreg16[i]);
             return;
         
         case 4:
-            fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg32[i]);
+            fprintf(STREAM, "\tmov [rbp + %d], %s\n", offset, argreg32[i]);
             return;
         
         default:
-            fprintf(STREAM, "\tmov [rbp - %d], %s\n", offset, argreg64[i]);
+            fprintf(STREAM, "\tmov [rbp + %d], %s\n", offset, argreg64[i]);
             return;
     }
 }
@@ -484,7 +484,8 @@ static void assign_lvar_offsets(Obj *globals){
         int offset = 0;
         for(Obj *lvar = fn -> locals; lvar; lvar = lvar ->next){
             offset += lvar -> ty -> size;
-            lvar -> offset = offset;
+            offset = align_to(offset, lvar -> align);
+            lvar -> offset = -offset;
         }
         fn -> stack_size = align_to(offset, 16);
     }
@@ -496,7 +497,7 @@ static void emit_data(Obj *globals){
             continue;
         }
         fprintf(STREAM, ".global %s\n", gvar -> name); 
-        fprintf(STREAM, ".align %d\n", gvar -> ty -> align);
+        fprintf(STREAM, ".align %d\n", gvar -> align);
         
         if(gvar -> init_data){
             fprintf(STREAM, ".data\n");

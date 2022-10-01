@@ -31,6 +31,7 @@ typedef struct {
     bool is_typedef;
     bool is_static;
     bool is_extern;
+    int align;
 }VarAttr;
 
 typedef struct TagScope TagScope;
@@ -144,6 +145,7 @@ static Type *find_typedef(Token *tok){
 static Obj* new_var(char* name, Type* ty){
     Obj* var = calloc(1, sizeof(Obj));
     var -> ty = ty;
+    var -> align = ty -> align;
     var -> name = name;
     push_scope(name) -> var = var;
     return var;
@@ -218,6 +220,7 @@ static Node* new_var_node(Obj *var){
 
 static bool is_typename(Token *tok);
 static Type* declspec(VarAttr *attr);
+static Type *typename(void);
 static Type* func_params(Type *ret_ty);
 static Type* type_suffix(Type *ty);
 static Type *array_dementions(Type *ty);
@@ -226,7 +229,7 @@ static Type *abstract_declarator(Type *ty);
 static Node *expr_stmt(void);
 static Node* stmt(void);
 static Node* compound_stmt(void);
-static Node* declaration(Type *base);
+static Node* declaration(Type *base, VarAttr *attr);
 static void assign_initializer(Initializer *init);
 static Node *lvar_initializer(Obj *var);
 static void gvar_initialzier(Obj *var);
@@ -329,6 +332,9 @@ static void global_variable(Type *base, VarAttr *attr){
         Type *ty = declarator(base);
         Obj *var = new_gvar(get_ident(ty -> name), ty);
         var -> is_definition = !attr -> is_extern;
+        if(attr -> align)
+            var -> align = attr -> align;
+    
         if(consume("="))
             gvar_initialzier(var);
     }
@@ -428,7 +434,7 @@ static Node* stmt(void){
         expect("(");
         if(is_typename(token)){
             Type *base = declspec(NULL);
-            node -> init = declaration(base);
+            node -> init = declaration(base, NULL);
         }else{
             node -> init = expr_stmt();
         }
@@ -541,7 +547,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(Token *tok){
-    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum", "static", "extern"};
+    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum", "static", "extern", "_Alignas"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(tok, kw[i])){
             return true;
@@ -575,7 +581,7 @@ static Node* compound_stmt(void){
                 continue;
             }
 
-            cur = cur -> next = declaration(base);
+            cur = cur -> next = declaration(base, &attr);
         }
         else{
             cur = cur -> next = stmt();
@@ -587,28 +593,26 @@ static Node* compound_stmt(void){
     return node;
 }
 
-static Member *new_member(Token *name, Type *ty){
-    struct Member *member = calloc(1, sizeof(Member));
-    member -> name = name;
-    member -> ty = ty;
-    return member;
-}
-
 // struct-members = (declspec declarator ( "," declarator)* ";" )* "}"
 static void struct_members(Type *ty){
     Member head = {};
     Member *cur = &head;
     int idx = 0;
     while(!consume("}")){
-        Type *base = declspec(NULL);
+        VarAttr attr = {};
+        Type *base = declspec(&attr);
         bool is_first = true;
         while(!consume(";")){
              if(!is_first)
                 expect(",");
             is_first = false;
-            Type *ty = declarator(base);
-            cur = cur -> next = new_member(ty -> name, ty);
-            cur -> idx = idx++;
+
+            struct Member *mem = calloc(1, sizeof(Member));
+            mem -> ty = declarator(base);
+            mem -> name = mem -> ty -> name;
+            mem -> idx = idx++;
+            mem -> align = attr.align? attr.align : mem -> ty -> align;
+            cur = cur -> next = mem;
         }
     }
 
@@ -671,12 +675,12 @@ static Type *struct_decl(void){
     
     int offset = 0;
     for(Member *m = ty -> members; m; m = m -> next){
-        offset = align_to(offset, m -> ty -> align);
+        offset = align_to(offset, m -> align);
         m -> offset = offset;
         offset += m -> ty -> size;
         /* 構造体のalignmentは最もaligmenが大きいメンバに合わせる。*/
-        if(ty -> align < m -> ty -> align){
-            ty -> align = m -> ty -> align;
+        if(ty -> align < m -> align){
+            ty -> align = m -> align;
         }
     }
     ty -> size = align_to(offset, ty -> align);
@@ -696,8 +700,8 @@ static Type *union_decl(void){
         if(ty -> size < m -> ty -> size){
             ty -> size = m -> ty -> size; // 共用体のサイズは最も大きいメンバに合わせる。
         }
-        if(ty -> align < m -> ty -> align){
-            ty -> align = m -> ty -> align;
+        if(ty -> align < m -> align){
+            ty -> align = m -> align;
         }
     }
     return ty;
@@ -794,6 +798,17 @@ static Type* declspec(VarAttr *attr){
             if(attr -> is_typedef && attr -> is_static + attr -> is_extern > 1)
                 error_at(token -> str, "typedef may not be used with static or extern\n");
             token = token -> next;
+            continue;
+        }
+
+        // "Alignas" "(" num | typename ")" 
+        if(consume("_Alignas")){
+            expect("(");
+            if(is_typename(token))
+                attr -> align = typename() -> align;
+            else 
+                attr -> align = const_expr();
+            expect(")");
             continue;
         }
 
@@ -987,7 +1002,7 @@ static Type *typename(void){
 }
 
 /* declspec declarator ("=" lvar-initalizer)? ("," declarator ("=" lvar-intializer)?)* ";" */
-static Node *declaration(Type *base){
+static Node *declaration(Type *base, VarAttr *attr){
     Node head = {};
     Node *cur = &head;
     while(!consume(";")){
@@ -997,6 +1012,9 @@ static Node *declaration(Type *base){
             error_at(ty -> name -> str, "variable declared void");
 
         Obj *lvar = new_lvar(get_ident(ty -> name), ty);
+
+        if(attr && attr -> align)
+            lvar -> align = attr -> align;
         
         if(consume("=")){
             Node *expr = lvar_initializer(lvar);
@@ -1833,6 +1851,7 @@ static Node* postfix(void){
             | str
             | "sizeof" typename
             | "sizeof" unary 
+            | "Alignof" "(" type-name ")"
             | num */
 static Node* primary(void){
     Node* np;
@@ -1848,6 +1867,13 @@ static Node* primary(void){
             expect(")");
             return np;
         }
+    }
+
+    if(consume("_Alignof")){
+        expect("(");
+        Type *ty = typename();
+        expect(")");
+        return new_num_node(ty -> align);
     }
 
     if(is_ident()){

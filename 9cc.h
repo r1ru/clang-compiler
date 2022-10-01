@@ -122,6 +122,7 @@ struct Member{
     Token *name;
     int offset;
     int idx; // 何番目のメンバか    
+    int align; // alignment
 };
 
 typedef struct Relocation Relocation;
@@ -139,7 +140,8 @@ struct Obj{
     Type *ty; // 型情報
     char *name; // 変数の名前
     int offset; // RBPからのオフセット
-
+    int align; // alignment
+    
     // global variable
     bool is_global;
     char *init_data;
