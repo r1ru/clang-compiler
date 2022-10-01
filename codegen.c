@@ -496,6 +496,7 @@ static void emit_data(Obj *globals){
             continue;
         }
         fprintf(STREAM, ".global %s\n", gvar -> name); 
+        fprintf(STREAM, ".align %d\n", gvar -> ty -> align);
         
         if(gvar -> init_data){
             fprintf(STREAM, ".data\n");
