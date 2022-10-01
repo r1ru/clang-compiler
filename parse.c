@@ -377,7 +377,7 @@ static Node *expr_stmt(void){
     return node;
 }
 
-/* stmt = "return" expr ";" 
+/* stmt = "return" expr? ";" 
         | "if" "(" expr ")" stmt ("else" stmt)?
         | "while" "(" expr ")" stmt
         | "for" "(" expr? ";" expr? ";" expr? ")" stmt 
@@ -394,6 +394,9 @@ static Node* stmt(void){
 
     if(consume("return")){
         Node *node = new_node(ND_RET);
+        if(consume(";"))
+            return node;
+        
         Node *exp = expr();
         add_type(exp);
         expect(";");
@@ -1760,9 +1763,17 @@ Node *new_cast(Node *lhs, Type *ty){
 /* cast = ( typename ) cast | unary */
 static Node *cast(void){
     if(is_equal(token, "(") && is_typename(token -> next)){
+        Token *tok = token;
         consume("(");
         Type *ty = typename();
         expect(")");
+        
+        // compound literal
+        if(is_equal(token , "{")){
+            token = tok;
+            return unary();
+        }
+
         return new_cast(cast(), ty);
     }
     return unary();
@@ -1823,8 +1834,27 @@ static Node *new_inc_dec(Node *node, int64_t added){
     return new_cast(new_add(to_assign(new_add(node, new_num_node(added))), new_num_node(-added)), node -> ty);
 }
 
-/* postfix  = primary ("[" expr "]" | "." ident | "->" ident | "++" | "--")* */
+/* postfix  = "(" typename ")" "{" inititlizer-list "}"
+            | primary ("[" expr "]" | "." ident | "->" ident | "++" | "--")* */
 static Node* postfix(void){
+
+    if(is_equal(token, "(") && is_typename(token -> next)){
+        expect("(");
+        Type *ty = typename();
+        expect(")");
+
+        if(scope -> next == NULL){
+            Obj *var = new_anon_gvar(ty);
+            gvar_initialzier(var);
+            return new_var_node(var);
+        }
+
+        Obj *var = new_lvar("", ty);
+        Node *lhs = lvar_initializer(var);
+        Node *rhs = new_var_node(var);
+        return new_binary(ND_COMMA, lhs, rhs);
+    }
+
     Node *node = primary();
     for(;;){
         if(consume("[")){

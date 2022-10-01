@@ -369,7 +369,8 @@ static void gen_stmt(Node* node){
     switch(node -> kind){
     
         case ND_RET:
-            gen_expr(node -> lhs);
+            if(node -> lhs)
+                gen_expr(node -> lhs);
             fprintf(STREAM, "\tjmp .L.end.%s\n", current_fn -> name);
             return;
 
