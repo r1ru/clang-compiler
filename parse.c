@@ -1852,6 +1852,7 @@ static Node* postfix(void){
             | "sizeof" typename
             | "sizeof" unary 
             | "Alignof" "(" type-name ")"
+            | "Alignof" unary
             | num */
 static Node* primary(void){
     Node* np;
@@ -1870,10 +1871,15 @@ static Node* primary(void){
     }
 
     if(consume("_Alignof")){
-        expect("(");
-        Type *ty = typename();
-        expect(")");
-        return new_num_node(ty -> align);
+        if(is_equal(token, "(") && is_typename(token -> next)){
+            expect("(");
+            Type *ty = typename();
+            expect(")");
+            return new_num_node(ty -> align);
+        }
+        Node *node = unary();
+        add_type(node);
+        return new_num_node(node -> ty -> align);
     }
 
     if(is_ident()){
