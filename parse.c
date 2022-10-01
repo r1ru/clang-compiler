@@ -176,8 +176,12 @@ static char* new_unique_name(void){
     return buf;
 }
 
+static Obj *new_anon_gvar(Type *ty){
+    return new_gvar(new_unique_name(), ty);
+}
+
 static Obj *new_string_literal(Token *tok){
-    Obj *strl = new_gvar(new_unique_name(), tok -> ty);
+    Obj *strl = new_anon_gvar(tok -> ty);
     strl -> init_data = tok -> str;
     return strl;
 }
@@ -1001,7 +1005,7 @@ static Type *typename(void){
     return abstract_declarator(base);
 }
 
-/* declspec declarator ("=" lvar-initalizer)? ("," declarator ("=" lvar-intializer)?)* ";" */
+/* declspec declarator ("=" initalizer)? ("," declarator ("=" intializer)?)* ";" */
 static Node *declaration(Type *base, VarAttr *attr){
     Node head = {};
     Node *cur = &head;
@@ -1010,6 +1014,14 @@ static Node *declaration(Type *base, VarAttr *attr){
 
         if(is_void(ty))
             error_at(ty -> name -> str, "variable declared void");
+
+        if(attr && attr -> is_static){
+            Obj *var = new_anon_gvar(ty);
+            push_scope(get_ident(ty -> name)) -> var = var;
+            if(consume("="))
+                gvar_initialzier(var);
+            continue;
+        }
 
         Obj *lvar = new_lvar(get_ident(ty -> name), ty);
 
