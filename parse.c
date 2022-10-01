@@ -163,6 +163,7 @@ static Obj *new_gvar(char *name, Type *ty) {
     Obj *gvar = new_var(name, ty);
     gvar -> is_definition = true;
     gvar -> is_global = true;
+    gvar -> is_static = true;
     gvar -> next = globals;
     globals = gvar;
     return gvar;
@@ -336,6 +337,8 @@ static void global_variable(Type *base, VarAttr *attr){
         Type *ty = declarator(base);
         Obj *var = new_gvar(get_ident(ty -> name), ty);
         var -> is_definition = !attr -> is_extern;
+        var -> is_static = attr -> is_static;
+        
         if(attr -> align)
             var -> align = attr -> align;
     

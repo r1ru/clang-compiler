@@ -497,7 +497,11 @@ static void emit_data(Obj *globals){
         if(is_func(gvar -> ty) || !gvar -> is_definition){
             continue;
         }
-        fprintf(STREAM, ".global %s\n", gvar -> name); 
+
+        if(gvar -> is_static)
+            fprintf(STREAM, ".local %s\n", gvar -> name);
+        else 
+            fprintf(STREAM, ".global %s\n", gvar -> name); 
         fprintf(STREAM, ".align %d\n", gvar -> align);
         
         if(gvar -> init_data){
