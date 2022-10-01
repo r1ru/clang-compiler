@@ -858,9 +858,15 @@ static Type* declspec(VarAttr *attr){
     return ty;
 }
 
-/* func-params = (param ("," param)*)? ")"
+/* func-params = ( "void" | param ("," param)*)? ")"
  param       = type-specifier declarator */
-static Type* func_params(Type *ret_ty){
+static Type* func_params(Type *ret_ty){ 
+    // func(void)は引数を取らないことを意味する。
+    if(is_equal(token, "void") && is_equal(token -> next, ")")){
+        token = token -> next ->next;
+        return func_type(ret_ty);
+    }
+
     Type head = {};
     Type *cur = &head;
     if(!is_equal(token, ")")){
