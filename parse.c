@@ -30,6 +30,7 @@ struct VarScope {
 typedef struct {
     bool is_typedef;
     bool is_static;
+    bool is_extern;
 }VarAttr;
 
 typedef struct TagScope TagScope;
@@ -158,6 +159,7 @@ static Obj *new_lvar(char* name, Type *ty){
 
 static Obj *new_gvar(char *name, Type *ty) {
     Obj *gvar = new_var(name, ty);
+    gvar -> is_definition = true;
     gvar -> is_global = true;
     gvar -> next = globals;
     globals = gvar;
@@ -318,7 +320,7 @@ static void function(Type *base, VarAttr *attr){
 }
 
 // global_variable = declarator ( "=" global-initialzier )? ("," declarator ("=" global-initialzier )? )* 
-static void global_variable(Type *base){
+static void global_variable(Type *base, VarAttr *attr){
     bool is_first = true;
     while(!consume(";")){
         if(!is_first)
@@ -326,6 +328,7 @@ static void global_variable(Type *base){
         is_first = false;
         Type *ty = declarator(base);
         Obj *var = new_gvar(get_ident(ty -> name), ty);
+        var -> is_definition = !attr -> is_extern;
         if(consume("="))
             gvar_initialzier(var);
     }
@@ -348,7 +351,7 @@ Obj * parse(void){
             continue;
         }
         
-        global_variable(base);
+        global_variable(base, &attr);
     }
     return globals;
 }
@@ -538,7 +541,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(Token *tok){
-    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum", "static"};
+    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum", "static", "extern"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(tok, kw[i])){
             return true;
@@ -766,17 +769,19 @@ static Type* declspec(VarAttr *attr){
     while(is_typename(token)){
 
         /* handle strorage class specifiers */
-        if(is_equal(token, "typedef") || is_equal(token, "static")){
+        if(is_equal(token, "typedef") || is_equal(token, "static") || is_equal(token, "extern")){
             if(!attr){
                 error_at(token -> str, "storage class specifier is not allowed in this context");
             }
             if(is_equal(token, "typedef"))
                 attr -> is_typedef = true;
-            else
+            else if(is_equal(token, "static"))
                 attr -> is_static = true;
+            else
+                attr -> is_extern = true;
 
-            if(attr -> is_typedef + attr -> is_static > 1)
-                error_at(token -> str, "typedef and static may not be used together\n");
+            if(attr -> is_typedef && attr -> is_static + attr -> is_extern > 1)
+                error_at(token -> str, "typedef may not be used with static or extern\n");
             token = token -> next;
             continue;
         }

@@ -492,7 +492,7 @@ static void assign_lvar_offsets(Obj *globals){
 
 static void emit_data(Obj *globals){
     for(Obj *gvar = globals; gvar; gvar = gvar -> next){
-        if(is_func(gvar -> ty)){
+        if(is_func(gvar -> ty) || !gvar -> is_definition){
             continue;
         }
         fprintf(STREAM, ".global %s\n", gvar -> name); 
