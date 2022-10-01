@@ -491,15 +491,15 @@ static void assign_lvar_offsets(Obj *globals){
 }
 
 static void emit_data(Obj *globals){
-    fprintf(STREAM, ".data\n");
     for(Obj *gvar = globals; gvar; gvar = gvar -> next){
         if(is_func(gvar -> ty)){
             continue;
         }
-        fprintf(STREAM, ".global %s\n", gvar -> name);
-        fprintf(STREAM, "%s:\n", gvar -> name); 
+        fprintf(STREAM, ".global %s\n", gvar -> name); 
         
         if(gvar -> init_data){
+            fprintf(STREAM, ".data\n");
+            fprintf(STREAM, "%s:\n", gvar -> name);
             int pos = 0;
             Relocation *rel = gvar -> rel;
             while(pos < gvar -> ty -> size){
@@ -513,6 +513,8 @@ static void emit_data(Obj *globals){
                 }
             }
         }else{
+            fprintf(STREAM, ".bss\n");
+            fprintf(STREAM, "%s:\n", gvar -> name);
             fprintf(STREAM, "\t.zero %d\n", gvar -> ty -> size);
         }
     }
