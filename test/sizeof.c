@@ -30,6 +30,7 @@ int main() {
     ASSERT(1, ({ char i; sizeof(i++); }));
     ASSERT(8, sizeof(int(*)[10]));
     ASSERT(8, sizeof(int(*)[][10]));
+    ASSERT(4, sizeof(struct { int x, y[]; }));
     
     printf("OK\n");
     return 0;

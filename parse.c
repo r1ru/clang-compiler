@@ -597,6 +597,14 @@ static Member *struct_members(void){
             cur -> idx = idx++;
         }
     }
+
+    // flexible array member 
+    // cur != &headのチェックはなぜ必要?
+    // struct {int x[];} x;のような入力も通ってしまう。
+    if(cur != &head && cur -> ty -> kind == TY_ARRAY && cur -> ty -> array_len < 0){
+        cur -> ty = array_of(cur -> ty -> base, 0);
+    }
+
     return head.next;
 } 
 
