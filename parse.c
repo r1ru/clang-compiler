@@ -564,6 +564,17 @@ static Node* compound_stmt(void){
                 parse_typedef(base);
                 continue;
             }
+
+            if(attr.is_extern){
+                global_variable(base, &attr);
+                continue;
+            }
+
+            if(is_function()){
+                function(base, &attr);
+                continue;
+            }
+
             cur = cur -> next = declaration(base);
         }
         else{
