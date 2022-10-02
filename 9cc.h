@@ -89,6 +89,8 @@ struct Type{
     Type *ret_ty;
     Type *next;
     Type *params;
+    bool is_variadic;
+    
 };
 
 extern Type *ty_long;

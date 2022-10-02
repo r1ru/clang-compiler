@@ -445,7 +445,7 @@ static Node* stmt(void){
 
         brk_label = brk;
         cont_label = cont;
-        
+
         expect("while");
         expect("(");
         node -> cond = expr();
@@ -919,8 +919,8 @@ static Type* declspec(VarAttr *attr){
     return ty;
 }
 
-/* func-params = ( "void" | param ("," param)*)? ")"
- param       = type-specifier declarator */
+/* func-params = ( "void" | param ("," param)* ("," "...")?)? ")"
+ param       = type-specifier declarator*/
 static Type* func_params(Type *ret_ty){ 
     // func(void)は引数を取らないことを意味する。
     if(is_equal(token, "void") && is_equal(token -> next, ")")){
@@ -930,23 +930,34 @@ static Type* func_params(Type *ret_ty){
 
     Type head = {};
     Type *cur = &head;
-    if(!is_equal(token, ")")){
-        do{
-            Type *ty = declspec(NULL); // 仮引数にtypedefは来れない。
-            ty = declarator(ty);
+    bool is_variadic = false;
 
-            /* array of T を pointer to T に変換する */
-            if(ty -> kind == TY_ARRAY){
-                Token *name = ty -> name;
-                ty = pointer_to(ty -> base);
-                ty -> name = name;
-            }
-            cur = cur -> next = copy_type(ty); // copyしないと上書きされる可能性があるから。
-        }while(consume(","));   
+    while(!consume(")")){
+        if(cur != &head)
+            expect(",");
+        
+        if(consume("...")){
+            is_variadic = true;
+            expect(")");
+            break;
+        }
+
+        Type *ty = declspec(NULL); // 仮引数にtypedefは来れない。
+        ty = declarator(ty);
+
+        /* array of T を pointer to T に変換する */
+        if(ty -> kind == TY_ARRAY){
+            Token *name = ty -> name;
+            ty = pointer_to(ty -> base);
+            ty -> name = name;
+        }
+
+        cur = cur -> next = copy_type(ty); // copyしないと上書きされる可能性があるから。
     }
+
     Type *func = func_type(ret_ty);
     func -> params = head.next;
-    expect(")");
+    func -> is_variadic = is_variadic;
     return func;
 }
 
