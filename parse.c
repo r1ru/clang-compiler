@@ -959,6 +959,9 @@ static Type* func_params(Type *ret_ty){
         cur = cur -> next = copy_type(ty); // copyしないと上書きされる可能性があるから。
     }
 
+    if(cur == &head)
+        is_variadic = true; // func()のように引数の指定がない場合
+    
     Type *func = func_type(ret_ty);
     func -> params = head.next;
     func -> is_variadic = is_variadic;
@@ -2024,8 +2027,15 @@ static Node* funcall(void){
     expect("(");
     /* 例えばf(1,2,3)の場合、リストは3->2->1のようにする。これはコード生成を簡単にするため。 */
     while(!consume(")")){
+        if(cur != &head)
+            expect(",");
+    
         Node *arg = assign();
         add_type(arg);
+
+        if(!param_ty && !ty -> is_variadic)
+            error("too many argments");
+        
         /* int printf()のように、voidが子手入れされいない場合、任意の型を渡せる。*/
         if(param_ty){
             if(param_ty -> kind == TY_STRUCT || param_ty -> kind == TY_UNION){
@@ -2036,10 +2046,10 @@ static Node* funcall(void){
         }
 
         cur = cur -> next = arg;
-        
-        if(consume(","))
-            continue;
     }
+
+    if(param_ty)
+        error("too few argments");
 
     Node* node = new_node(ND_FUNCCALL);
     node -> funcname = func_name;
