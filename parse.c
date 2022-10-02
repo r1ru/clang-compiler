@@ -319,7 +319,11 @@ static void function(Type *base, VarAttr *attr){
     locals = NULL;
     enter_scope(); //仮引数を関数のスコープに入れるため。
     create_param_lvars(ty -> params);
-    func -> params = locals;
+    func -> params = locals; // 可変長引数はparamには含まない。
+
+    if(ty -> is_variadic)
+        func -> va_area = new_lvar("__va_area__", array_of(ty_char, 136));
+    
     expect("{");
     func -> body = compound_stmt();
     func-> locals = locals;

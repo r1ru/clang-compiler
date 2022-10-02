@@ -586,6 +586,35 @@ static void emit_text(Obj *globals){
         fprintf(STREAM, "\tmov rbp, rsp\n");
         fprintf(STREAM, "\tsub rsp, %u\n", fn -> stack_size);
 
+        // 可変長引数関数
+        if(fn -> va_area){
+            int gp = 0;
+            for(Obj *var = fn -> params; var; var = var ->next)
+                gp++;
+            int off = fn -> va_area -> offset;
+
+            // va_elem
+            fprintf(STREAM, "\tmov [rbp + %d], DWORD PTR %d\n", off, gp * 8);
+            fprintf(STREAM, "\tmov [rbp + %d], DWORD PTR 0\n", off + 4);
+            fprintf(STREAM, "\tmovq [rbp + %d], rbp\n", off + 16);
+            fprintf(STREAM, "\taddq [rbp + %d], %d\n", off + 16, off + 24);
+            // __reg_save_area__
+            fprintf(STREAM, "\tmovq [rbp + %d], rdi\n", off + 24);
+            fprintf(STREAM, "\tmovq [rbp + %d], rsi\n", off + 32);
+            fprintf(STREAM, "\tmovq [rbp + %d], rdx\n", off + 40);
+            fprintf(STREAM, "\tmovq [rbp + %d], rcx\n", off + 48);
+            fprintf(STREAM, "\tmovq [rbp + %d], r8\n", off + 56);
+            fprintf(STREAM, "\tmovq [rbp + %d], r9\n", off + 64);
+            fprintf(STREAM, "\tmovsd [rbp + %d], xmm0\n", off + 72);
+            fprintf(STREAM, "\tmovsd [rbp + %d], xmm1\n", off + 80);
+            fprintf(STREAM, "\tmovsd [rbp + %d], xmm2\n", off + 88);
+            fprintf(STREAM, "\tmovsd [rbp + %d], xmm3\n", off + 96);
+            fprintf(STREAM, "\tmovsd [rbp + %d], xmm4\n", off + 104);
+            fprintf(STREAM, "\tmovsd [rbp + %d], xmm5\n", off + 112);
+            fprintf(STREAM, "\tmovsd [rbp + %d], xmm6\n", off + 120);
+            fprintf(STREAM, "\tmovsd [rbp + %d], xmm7\n", off + 128);
+        }
+
         int i = 0;
         /* パラメータをスタック領域にコピー */
         for(Obj *var = fn -> params; var; var = var -> next)

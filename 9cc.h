@@ -90,7 +90,7 @@ struct Type{
     Type *next;
     Type *params;
     bool is_variadic;
-    
+
 };
 
 extern Type *ty_long;
@@ -154,6 +154,7 @@ struct Obj{
     bool is_static;
     Obj *params;
     Obj *locals;
+    Obj *va_area; // 可変長引数関数
     Node *body;
     int stack_size;
 };
