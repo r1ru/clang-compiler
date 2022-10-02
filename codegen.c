@@ -1,6 +1,8 @@
 #include "9cc.h"
 
 static Obj *current_fn; // 現在コードを生成している関数
+static int depth; 
+
 static char* argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static char* argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
 static char* argreg16[] = {"di", "si", "dx", "cx", "r8w", "r9w"};
@@ -11,10 +13,12 @@ static void gen_stmt(Node* node);
 
 static void push(void){
     fprintf(STREAM, "\tpush rax\n");
+    depth++;
 }
 
 static void pop(char* arg){
     fprintf(STREAM, "\tpop %s\n", arg);
+    depth--;
 }
 
 static int get_index(void){
@@ -199,7 +203,15 @@ static void gen_expr(Node* node){
                 pop(argreg64[i]);
             }
             fprintf(STREAM, "\tmov rax, 0\n"); // 浮動小数点の引数の個数
-            fprintf(STREAM, "\tcall %s\n", node -> funcname);
+
+            // alignment
+            if(depth % 2 == 0)
+                fprintf(STREAM, "\tcall %s\n", node -> funcname);
+            else{
+                fprintf(STREAM, "\tsub rsp, 8\n");
+                fprintf(STREAM, "\tcall %s\n", node -> funcname);
+                fprintf(STREAM, "\tadd rsp, 8\n");
+            }
             return;
         }
         
@@ -557,18 +569,16 @@ static void emit_text(Obj *globals){
         /* プロローグ。 */
         fprintf(STREAM, "\tpush rbp\n");
         fprintf(STREAM, "\tmov rbp, rsp\n");
-        if(fn -> stack_size != 0){
-            fprintf(STREAM, "\tsub rsp, %u\n", fn -> stack_size);
-        }
+        fprintf(STREAM, "\tsub rsp, %u\n", fn -> stack_size);
 
         int i = 0;
         /* パラメータをスタック領域にコピー */
-        for(Obj *var = fn -> params; var; var = var -> next){
-            store_arg(i, var -> offset, var -> ty -> size);
-            i++;
-        }
+        for(Obj *var = fn -> params; var; var = var -> next)
+            store_arg(i++, var -> offset, var -> ty -> size);
+    
         /* コード生成 */
         gen_stmt(fn -> body);
+        assert(depth == 0); //プロローグで確保したスタックフレーム以外の領域を使っていないことをチェック
 
         /* エピローグ */
         fprintf(STREAM, ".L.end.%s:\n", fn -> name); // このラベルは関数ごと。
