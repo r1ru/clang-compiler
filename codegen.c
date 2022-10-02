@@ -212,6 +212,21 @@ static void gen_expr(Node* node){
                 fprintf(STREAM, "\tcall %s\n", node -> funcname);
                 fprintf(STREAM, "\tadd rsp, 8\n");
             }
+
+            switch(node -> ty -> kind){
+                case TY_BOOL:
+                    fprintf(STREAM, "\tmovzx eax, al\n");
+                    return;
+                
+                case TY_CHAR:
+                    fprintf(STREAM, "\tmovsx eax, al\n");
+                    return;
+
+                case TY_SHORT:
+                    fprintf(STREAM, "\tmovsx eax, ax\n");
+                    return;
+            }
+            
             return;
         }
         
