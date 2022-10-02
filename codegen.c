@@ -378,14 +378,14 @@ static void gen_stmt(Node* node){
             int idx = get_index();
             gen_expr(node -> cond);
             fprintf(STREAM, "\tcmp rax, 0\n");
-            fprintf(STREAM, "\tje .L.else.%u\n", idx); // 条件式が偽の時はelseに指定されているコードに飛ぶ
+            fprintf(STREAM, "\tje .L.else.%d\n", idx); // 条件式が偽の時はelseに指定されているコードに飛ぶ
             gen_stmt(node -> then); // 条件式が真の時に実行される。
-            fprintf(STREAM, "\tjmp .L.end.%u\n", idx);
-            fprintf(STREAM, ".L.else.%u:\n", idx);
+            fprintf(STREAM, "\tjmp .L.end.%d\n", idx);
+            fprintf(STREAM, ".L.else.%d:\n", idx);
             if(node -> els){
                 gen_stmt(node -> els); // 条件式が偽の時に実行される。
             }
-            fprintf(STREAM, ".L.end.%u:\n", idx);
+            fprintf(STREAM, ".L.end.%d:\n", idx);
             return;
         }
 
@@ -394,7 +394,7 @@ static void gen_stmt(Node* node){
             if(node -> init){
                 gen_stmt(node -> init);
             }
-            fprintf(STREAM, ".L.begin.%u:\n", idx);
+            fprintf(STREAM, ".L.begin.%d:\n", idx);
             if(node -> cond){
                 gen_expr(node -> cond);
                 fprintf(STREAM, "\tcmp rax, 0\n");
@@ -406,7 +406,19 @@ static void gen_stmt(Node* node){
             if(node -> inc){
                 gen_expr(node -> inc);
             }
-            fprintf(STREAM, "\tjmp .L.begin.%u\n", idx); // 条件式の評価に戻る
+            fprintf(STREAM, "\tjmp .L.begin.%d\n", idx); // 条件式の評価に戻る
+            fprintf(STREAM, "%s:\n", node -> brk_label);
+            return;
+        }
+        
+        case ND_DO:{
+            int idx = get_index();
+            fprintf(STREAM, ".L.begin.%d:\n", idx);
+            gen_stmt(node -> then);
+            fprintf(STREAM, "%s:\n", node -> cont_label);
+            gen_expr(node -> cond);
+            fprintf(STREAM, "\tcmp rax, 0\n");
+            fprintf(STREAM, "\tjne .L.begin.%d\n", idx);
             fprintf(STREAM, "%s:\n", node -> brk_label);
             return;
         }

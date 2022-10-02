@@ -177,6 +177,7 @@ typedef enum{
     ND_RET, // return
     ND_IF, // if
     ND_FOR, // for and while
+    ND_DO, // do while
     ND_SWITCH, // switch
     ND_CASE, // case
     ND_BLOCK, // {}

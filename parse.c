@@ -383,6 +383,7 @@ static Node *expr_stmt(void){
 /* stmt = "return" expr? ";" 
         | "if" "(" expr ")" stmt ("else" stmt)?
         | "while" "(" expr ")" stmt
+        | "do" stmt "while" "(" expr ")" ";"
         | "for" "(" expr? ";" expr? ";" expr? ")" stmt 
         | "goto" ident 
         | ident ":" stmt
@@ -431,6 +432,25 @@ static Node* stmt(void){
         node -> then = stmt();
         brk_label = brk;
         cont_label = cont;
+        return node;
+    }
+
+    if(consume("do")){
+        Node *node = new_node(ND_DO);
+        char *brk = brk_label;
+        char *cont = cont_label;
+        brk_label = node -> brk_label = new_unique_name();
+        cont_label = node -> cont_label = new_unique_name();
+        node -> then = stmt();
+
+        brk_label = brk;
+        cont_label = cont;
+        
+        expect("while");
+        expect("(");
+        node -> cond = expr();
+        expect(")");
+        expect(";");
         return node;
     }
 
