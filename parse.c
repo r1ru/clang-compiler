@@ -581,7 +581,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(Token *tok){
-    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum", "static", "extern", "_Alignas"};
+    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum", "static", "extern", "_Alignas", "signed"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(tok, kw[i])){
             return true;
@@ -796,7 +796,7 @@ static Type *enum_specifier(void){
     return ty;
 }
 
-/*  declspec    = ("void" | "char" | "short" | "int" | "long" | "_Bool"
+/*  declspec    = ("void" | "char" | "short" | "int" | "long" | "_Bool" | "signed"
                 | struct-decl 
                 | union-decl 
                 | typedef-name
@@ -808,7 +808,9 @@ static Type* declspec(VarAttr *attr){
         CHAR = 1 << 4,
         SHORT = 1 << 6,
         INT = 1 << 8,
-        LONG = 1 << 10
+        LONG = 1 << 10,
+        OTHER = 1 << 11, 
+        SIGNED = 1 << 12
     };
 
     int counter = 0;
@@ -846,48 +848,51 @@ static Type* declspec(VarAttr *attr){
             continue;
         }
 
-        ty = find_typedef(token);
-        /* typedefされた型だった場合 */
-        if(ty && counter == 0){
+
+        // handle user-degine types
+        ty = find_typedef(token); // 型名で無ければNULL
+        
+        // typedefされた型名と同名の変数定義
+        if(ty && counter)
+            break;
+
+        // typedefされた型名
+        if(ty){
             next_token();
-            return ty;
-        }
-        /* 新しい型の宣言 */
-        if(ty && counter != 0){
             break;
         }
-
-
-        if(consume("struct")){
+        
+        if(consume("struct"))
             return struct_decl();
-        }
-        if(consume("union")){
+
+        if(consume("union"))
             return union_decl();
-        }
-        if(consume("enum")){
+
+        if(consume("enum"))
             return enum_specifier();
-        }
 
-        if(consume("_Bool")){
+        // handle built-in types
+        if(consume("_Bool"))
             counter += BOOL;
-        }
-
-        if(consume("void")){
+        
+        if(consume("void"))
             counter += VOID;
-        }
-        if(consume("char")){
+        
+        if(consume("char"))
             counter += CHAR;
-        }
-        if(consume("short")){
+        
+        if(consume("short"))
             counter += SHORT ;
-        }
-        if(consume("int")){
+        
+        if(consume("int"))
             counter += INT ;
-        }
-        if(consume("long")){
-            counter += LONG;
-        }
 
+        if(consume("long"))
+            counter += LONG;
+
+        if(consume("signed"))
+            counter |= SIGNED;
+        
         switch(counter){
             case BOOL:
                 ty = ty_bool;
@@ -898,21 +903,31 @@ static Type* declspec(VarAttr *attr){
                 break;
 
             case CHAR:
+            case SIGNED + CHAR:
                 ty = ty_char;
                 break;
 
             case SHORT:
             case SHORT + INT:
+            case SIGNED + SHORT:
+            case SIGNED + SHORT + INT:
                 ty = ty_short;
                 break;
 
             case INT:
+            case SIGNED:
+            case SIGNED + INT:
                 ty = ty_int;
                 break;
             
             case LONG:
             case LONG + INT:
             case LONG + LONG:
+            case LONG + LONG + INT:
+            case SIGNED + LONG:
+            case SIGNED + LONG + INT:
+            case SIGNED + LONG + LONG:
+            case SIGNED + LONG + LONG + INT:
                 ty = ty_long;
                 break;
             
