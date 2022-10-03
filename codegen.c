@@ -32,18 +32,20 @@ static void load(Type* ty){
         return;
     }
 
+    char *inst = ty -> is_unsigned ? "movzx" : "movsx";
+    
     /* sxはsign extendedの略 */
     switch(ty -> size){
         case 1:
-            fprintf(STREAM, "\tmovsx eax, BYTE PTR [rax]\n"); 
+            fprintf(STREAM, "\t%s eax, BYTE PTR [rax]\n", inst); 
             return;
         
         case 2:
-            fprintf(STREAM, "\tmovsx eax, BYTE PTR [rax]\n"); 
+            fprintf(STREAM, "\t%s eax, WORD PTR [rax]\n", inst); 
             return;
 
         case 4:
-            fprintf(STREAM, "\tmovsxd rax, [rax]\n");
+            fprintf(STREAM, "\t%s rax, [rax]\n", "movsxd");
             return;
         
         default:
@@ -114,35 +116,53 @@ static void gen_addr(Node *node) {
     error("代入の左辺値が変数ではありません");
 }
 
-enum { I8, I16, I32, I64};
+
+static void cmp_zero(Type *ty){
+    if(is_integer(ty) && ty -> size <= 4)
+        fprintf(STREAM, "\tcmp eax, 0\n");
+    else 
+        fprintf(STREAM, "\tcmp rax, 0\n");
+}
+
+enum { I8, I16, I32, I64, U8, U16, U32, U64};
 
 static int getTypeId(Type *ty){
     switch(ty -> kind){
         case TY_CHAR:
-            return I8;
+            return ty -> is_unsigned ? U8 : I8;
         
         case TY_SHORT:
-            return I16;
+            return ty -> is_unsigned ? U16 : I16;
         
         case TY_INT:
-            return I32;
+            return ty -> is_unsigned ? U32 : I32;
+        
+        case TY_LONG:
+            return ty -> is_unsigned ? U64 : I64;
         
     }
-    return I64; // ty_longとかpointer型とか。
+    return U64;
 }
 
+// ex) i32i8: from I32 to I8
 static char i32i8[] = "movsx eax, al";
+static char i32u8[] = "movzx eax, al";
 static char i32i16[] = "movsx eax, ax";
+static char i32u16[] = "movzx eax, ax";
 static char i32i64[] = "movsxd rax, eax";
+static char u32i64[] = "mov eax, eax";
 
-/*  cast to i8: alが有効
-    cast to i16: axが有効
-    cast to i64: 現状fromがeaxかalなので普通にeaxをraxに拡張すればいい。*/ 
 static char *cast_table[][10] = {
-  {NULL,  NULL,   NULL, i32i64}, // i8
-  {i32i8, NULL,   NULL, i32i64}, // i16
-  {i32i8, i32i16, NULL, i32i64}, // i32
-  {i32i8, i32i16, NULL, NULL},   // i64
+    // i8   i16     i32    i64      u8      u16      u32    u64
+    {NULL,  NULL,   NULL,  i32i64,  i32u8,  i32u16,  NULL,  i32i64}, // i8
+    {i32i8, NULL,   NULL,  i32i64,  i32u8,  i32u16,  NULL,  i32i64}, // i16
+    {i32i8, i32i16, NULL,  i32i64,  i32u8,  i32u16,  NULL,  i32i64}, // i32
+    {i32i8, i32i16, NULL,  NULL,    i32u8,  i32u16,  NULL,  NULL},   // i64
+    {i32i8, NULL,   NULL,  i32i64,   NULL,  NULL,    NULL,  i32i64}, // u8
+    {i32i8, i32i16, NULL,  i32i64,   i32u8, NULL,    NULL,  i32i64}, // u16
+    {i32i8, i32i16, NULL,  u32i64,   i32u8, i32u16,  NULL,  u32i64}, // u32
+    {i32i8, i32i16, NULL,  NULL,     i32u8, i32u16,  NULL,  NULL},   // u64
+
 };
 
 static void cast(Type *from, Type *to){
@@ -150,7 +170,7 @@ static void cast(Type *from, Type *to){
         return; // voidへのキャストは無視
     }
     if(to -> kind == TY_BOOL){
-        fprintf(STREAM, "\tcmp rax, 0\n");
+        cmp_zero(from);
         fprintf(STREAM, "\tsetne al\n");
         fprintf(STREAM, "\tmovzx eax, al\n");
         return;
@@ -219,11 +239,17 @@ static void gen_expr(Node* node){
                     return;
                 
                 case TY_CHAR:
-                    fprintf(STREAM, "\tmovsx eax, al\n");
+                    if(node -> ty -> is_unsigned)
+                        fprintf(STREAM, "\tmovzx eax, al\n");
+                    else
+                        fprintf(STREAM, "\tmovsx eax, al\n");
                     return;
 
                 case TY_SHORT:
-                    fprintf(STREAM, "\tmovsx eax, ax\n");
+                    if(node -> ty -> is_unsigned)
+                        fprintf(STREAM, "\tmovzx eax, ax\n");
+                    else 
+                        fprintf(STREAM, "\tmovsx eax, ax\n");
                     return;
             }
             
@@ -327,23 +353,43 @@ static void gen_expr(Node* node){
     gen_expr(node -> lhs);
     pop("rdi");
 
+    char *ax, *di, *dx;
+
+    if(node -> lhs -> ty -> kind == TY_LONG || node -> lhs -> ty -> base){
+        ax = "rax";
+        di = "rdi";
+        dx = "rdx";
+    }else{
+        ax = "eax";
+        di = "edi";
+        dx = "edx";
+    }
+
     switch(node -> kind){
         case ND_ADD:
-            fprintf(STREAM, "\tadd rax, rdi\n");
+            fprintf(STREAM, "\tadd %s, %s\n", ax, di);
             return;
     
         case ND_SUB:
-            fprintf(STREAM, "\tsub rax, rdi\n");
+            fprintf(STREAM, "\tsub %s, %s\n", ax, di);
             return;
 
         case ND_MUL:
-            fprintf(STREAM, "\timul rax, rdi\n");
+            fprintf(STREAM, "\timul %s, %s\n", ax, di);
             return;
 
         case ND_DIV:
         case ND_MOD:
-            fprintf(STREAM, "\tcqo\n");
-            fprintf(STREAM, "\tidiv rdi\n");
+            if(node -> lhs -> ty -> is_unsigned){
+                fprintf(STREAM, "\tmov %s, 0\n", dx); //　上位bit0埋め
+                fprintf(STREAM, "\tdiv %s\n", di);
+            }else{
+                if(node -> lhs -> ty -> size == 8)
+                    fprintf(STREAM, "\tcqo\n");
+                else 
+                    fprintf(STREAM, "\tcdq\n");
+                fprintf(STREAM, "\tidiv %s\n", di);
+            }
             if(node -> kind == ND_MOD)
                 fprintf(STREAM, "\tmov rax, rdx\n");
             return;
@@ -367,14 +413,17 @@ static void gen_expr(Node* node){
         
         case ND_SHR:
             fprintf(STREAM, "\tmov rcx, rdi\n");
-            fprintf(STREAM, "\tsar rax, cl\n");
+            if(node -> lhs -> ty -> is_unsigned)
+                fprintf(STREAM, "\tshr %s, cl\n", ax);
+            else
+                fprintf(STREAM, "\tsar %s, cl\n", ax);
             return;
         
         case ND_EQ:
         case ND_NE:
         case ND_LT:
         case ND_LE:
-            fprintf(STREAM, "\tcmp rax, rdi\n");
+            fprintf(STREAM, "\tcmp %s, %s\n", ax, di);
         if(node -> kind == ND_EQ){
             fprintf(STREAM, "\tsete al\n");
         }
@@ -382,13 +431,21 @@ static void gen_expr(Node* node){
             fprintf(STREAM, "\tsetne al\n");
         }
         else if(node -> kind == ND_LT){
-            fprintf(STREAM, "\tsetl al\n");
+            if(node -> lhs -> ty -> is_unsigned)
+                fprintf(STREAM, "\tsetb al\n");
+            else
+                fprintf(STREAM, "\tsetl al\n");
         }
         else if(node -> kind == ND_LE){
-            fprintf(STREAM, "\tsetle al\n");
+            if(node -> lhs -> ty -> is_unsigned)
+                fprintf(STREAM, "\tsetbe al\n");
+            else 
+                fprintf(STREAM, "\tsetle al\n");
         }
-        fprintf(STREAM, "\tmovzb rax, al\n");
+        fprintf(STREAM, "\tmovzx rax, al\n");
         return;
+
+        error("invalid expression");
     }    
 }
 
@@ -462,7 +519,8 @@ static void gen_stmt(Node* node){
         case ND_SWITCH:
             gen_expr(node -> cond);
             for(Node *n = node -> case_next; n; n = n -> case_next){
-                fprintf(STREAM, "\tcmp rax, %ld\n", n -> val);
+                char *reg = (node -> cond -> ty -> size == 8) ? "rax" : "eax";
+                fprintf(STREAM, "\tcmp %s, %ld\n", reg, n -> val);
                 fprintf(STREAM, "\tje %s\n", n -> unique_label);
             }
             if(node -> default_case)

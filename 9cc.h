@@ -75,6 +75,8 @@ struct Type{
     TypeKind kind;
     int size;
     int align; // alignment
+    bool is_unsigned;
+    
     Token *name;
     Type *base;
 
@@ -99,6 +101,11 @@ extern Type *ty_short;
 extern Type *ty_char;
 extern Type *ty_void;
 extern Type *ty_bool;
+extern Type *ty_uchar;
+extern Type *ty_ushort;
+extern Type *ty_uint;
+extern Type *ty_ulong;
+
 Type *enum_type(void);
 
 Type *new_type(TypeKind kind, int size, int align);

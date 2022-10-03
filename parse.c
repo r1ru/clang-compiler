@@ -581,7 +581,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(Token *tok){
-    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum", "static", "extern", "_Alignas", "signed"};
+    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum", "static", "extern", "_Alignas", "signed", "unsigned"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(tok, kw[i])){
             return true;
@@ -796,7 +796,7 @@ static Type *enum_specifier(void){
     return ty;
 }
 
-/*  declspec    = ("void" | "char" | "short" | "int" | "long" | "_Bool" | "signed"
+/*  declspec    = ("void" | "char" | "short" | "int" | "long" | "_Bool" | "signed" | "unsigned"
                 | struct-decl 
                 | union-decl 
                 | typedef-name
@@ -809,8 +809,9 @@ static Type* declspec(VarAttr *attr){
         SHORT = 1 << 6,
         INT = 1 << 8,
         LONG = 1 << 10,
-        OTHER = 1 << 11, 
-        SIGNED = 1 << 12
+        OTHER = 1 << 12, 
+        SIGNED = 1 << 13,
+        UNSIGNED = 1 << 14
     };
 
     int counter = 0;
@@ -892,6 +893,9 @@ static Type* declspec(VarAttr *attr){
 
         if(consume("signed"))
             counter |= SIGNED;
+
+        if(consume("unsigned"))
+            counter |= UNSIGNED;
         
         switch(counter){
             case BOOL:
@@ -906,6 +910,10 @@ static Type* declspec(VarAttr *attr){
             case SIGNED + CHAR:
                 ty = ty_char;
                 break;
+            
+            case UNSIGNED + CHAR:
+                ty = ty_uchar;
+                break;
 
             case SHORT:
             case SHORT + INT:
@@ -914,10 +922,20 @@ static Type* declspec(VarAttr *attr){
                 ty = ty_short;
                 break;
 
+            case UNSIGNED + SHORT:
+            case UNSIGNED + SHORT + INT:
+                ty = ty_ushort;
+                break;
+            
             case INT:
             case SIGNED:
             case SIGNED + INT:
                 ty = ty_int;
+                break;
+            
+            case UNSIGNED:
+            case UNSIGNED + INT:
+                ty = ty_uint;
                 break;
             
             case LONG:
@@ -929,6 +947,13 @@ static Type* declspec(VarAttr *attr){
             case SIGNED + LONG + LONG:
             case SIGNED + LONG + LONG + INT:
                 ty = ty_long;
+                break;
+
+            case UNSIGNED + LONG:
+            case UNSIGNED + LONG + INT:
+            case UNSIGNED + LONG + LONG:
+            case UNSIGNED + LONG + LONG + INT:
+                ty = ty_ulong;
                 break;
             
             default:

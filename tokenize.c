@@ -104,7 +104,7 @@ static bool startswith(char* p1, char* p2){
 }
 
 static bool is_keyword(Token *tok){
-    static char* kw[] = {"return", "if", "else", "while", "for", "int", "sizeof", "char", "struct", "union", "long", "short", "void", "typedef", "_Bool", "enum", "static", "goto", "break", "continue", "switch", "case", "default", "extern", "_Alignas", "_Alignof", "do", "signed"};
+    static char* kw[] = {"return", "if", "else", "while", "for", "int", "sizeof", "char", "struct", "union", "long", "short", "void", "typedef", "_Bool", "enum", "static", "goto", "break", "continue", "switch", "case", "default", "extern", "_Alignas", "_Alignof", "do", "signed", "unsigned"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(tok, kw[i])){
             return true;
@@ -243,7 +243,7 @@ static Token* read_int_literal(char *p){
     }else if(*p == '0'){
         base = 8;
     }
-    int val = strtoul(p, &p, base);
+    int64_t val = strtoul(p, &p, base);
     if(isalnum(*p))
         error_at(start, "invalid digit\n");
     Token *tok = new_token(TK_NUM, start, p);
