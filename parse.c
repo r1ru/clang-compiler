@@ -2040,6 +2040,7 @@ static Node* primary(void){
 
     if(token -> kind == TK_NUM){
         Node *node = new_num_node(token -> val);
+        node -> ty = token -> ty;
         next_token();
         return node;
     }

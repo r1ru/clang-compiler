@@ -38,7 +38,7 @@ struct Token{
     Token* next;
     TokenKind kind;
     int64_t val;
-    Type *ty; // TK_STRの時のみ使用
+    Type *ty; // TK_NUM or TK_STR
     char* str;
     int len; // トークンの長さ
 };
