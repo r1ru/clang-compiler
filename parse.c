@@ -216,6 +216,14 @@ static Node* new_num_node(int64_t val){
     return np;
 }
 
+
+static Node *new_ulong(long val){
+    Node *node = new_node(ND_NUM);
+    node -> val = val;
+    node -> ty = ty_ulong;
+    return node;
+}
+
 /* ND_VARを作成 */
 static Node* new_var_node(Obj *var){
     Node* np = new_node(ND_VAR);
@@ -1787,7 +1795,7 @@ static Node* new_sub(Node *lhs, Node *rhs){
     if(is_ptr(lhs -> ty) && is_ptr(rhs -> ty)){
         Node *node = new_binary(ND_SUB, lhs, rhs);
         node -> ty = ty_long; 
-        return new_binary(ND_DIV, node, new_long(lhs -> ty -> base -> size));
+        return new_binary(ND_DIV, node, new_num_node(lhs -> ty -> base -> size));
     }
     /* pointer - num は pointer - sizeof(type) * num */
     if(is_ptr(lhs -> ty) && is_integer(rhs -> ty)){
@@ -1998,11 +2006,11 @@ static Node* primary(void){
             expect("(");
             Type *ty = typename();
             expect(")");
-            return new_num_node(ty -> align);
+            return new_ulong(ty -> align);
         }
         Node *node = unary();
         add_type(node);
-        return new_num_node(node -> ty -> align);
+        return new_ulong(node -> ty -> align);
     }
 
     if(is_ident()){
@@ -2030,11 +2038,11 @@ static Node* primary(void){
             next_token(); // '('を読み飛ばす
             Type *ty = typename();
             expect(")");
-            return new_num_node(ty -> size);
+            return new_ulong(ty -> size);
         }else{
             Node *node = unary();
             add_type(node);
-            return new_num_node(node -> ty -> size);
+            return new_ulong(node -> ty -> size);
         }
     }
 
