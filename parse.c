@@ -589,7 +589,7 @@ static Node* stmt(void){
 }
 
 static bool is_typename(Token *tok){
-    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum", "static", "extern", "_Alignas", "signed", "unsigned"};
+    static char* kw[] = {"void", "char", "short", "int", "long", "void", "struct", "union", "typedef", "_Bool", "enum", "static", "extern", "_Alignas", "signed", "unsigned", "const", "volatile", "auto", "register", "restrict", "__restrict", "__restrict__", "_Noreturn"};
     for(int i =0; i < sizeof(kw) / sizeof(*kw); i++){
         if(is_equal(tok, kw[i])){
             return true;
@@ -808,7 +808,9 @@ static Type *enum_specifier(void){
                 | struct-decl 
                 | union-decl 
                 | typedef-name
-                | enum-specifier )+ */
+                | enum-specifier 
+                | "const" | "volatile"| "auto" | "register" | "restrict"
+                | "__restrict" | "__restrict__" | "_Noreturn" )+ */
 static Type* declspec(VarAttr *attr){
     enum{
         BOOL = 1 << 0,
@@ -845,6 +847,9 @@ static Type* declspec(VarAttr *attr){
             token = token -> next;
             continue;
         }
+
+        if(consume("const") || consume("volatile") || consume("auto") || consume("register") || consume("restrict") || consume("__restrict") || consume("__restrict__") || consume("_Noreturn"))
+            continue;
 
         // "Alignas" "(" num | typename ")" 
         if(consume("_Alignas")){
@@ -1040,12 +1045,21 @@ static Type *array_dementions(Type *ty){
     return array_of(ty , siz);
 }
 
+// pointers = ("*" ( "const" | "volatile" | "restrict" | "__restrict" | "__restrict__")* )*
+static Type *pointers(Type *ty){
+    while(consume("*")){
+        ty = pointer_to(ty);
+        while(is_equal(token, "const") || is_equal(token, "volatile") || is_equal(token, "restrict") || is_equal(token, "__restrict") || is_equal(token, "__restrict__"))
+            token = token -> next;
+    }
+    return ty;
+}
+
 /* char (*a) [2];を考える。*aを読んだ段階ではこれが何のポインタなのか分からない。()がある場合は外側を先に確定させる必要がある。この例だと一旦()を無視して、int [2]を読んでint型の配列(要素数2)が確定する。次に()の中を読むことでaの型がintの配列(要素数2)へのポインタ型だと分かる。*/
 
-/* declarator = "*"*  (ident | "(" ident ")" | "(" declarator ")" ) type-suffix */
+/* declarator = pointers (ident | "(" ident ")" | "(" declarator ")" ) type-suffix */
 static Type* declarator(Type *ty){
-    while(consume("*"))
-        ty = pointer_to(ty);
+    ty = pointers(ty);
 
     if(consume("(")){
         Token *start = token;
@@ -1071,10 +1085,9 @@ static Type* declarator(Type *ty){
     return ty;
 }
 
-/* abstract-declarator = "*"* ("(" abstract-declarator ")")? type-suffix */
+/* abstract-declarator = pointers ("(" abstract-declarator ")")? type-suffix */
 static Type *abstract_declarator(Type *ty){
-    while(consume("*"))
-        ty = pointer_to(ty);
+    ty = pointers(ty);
     
     if(consume("(")){
         Token *start = token;
