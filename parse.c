@@ -1033,8 +1033,11 @@ static Type* type_suffix(Type *ty){
     return ty;
 }
 
-/* array-dementions = const-expr? "}" type-suffix */
+/* array-dementions = ("static" | "restrict")* const-expr? "}" type-suffix */
 static Type *array_dementions(Type *ty){
+    while(is_equal(token, "static") || is_equal(token, "restrict"))
+        token = token -> next;
+    
     if(consume("]")){
         ty = type_suffix(ty);
         return array_of(ty, -1);
