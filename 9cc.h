@@ -77,8 +77,11 @@ struct Type{
     int align; // alignment
     bool is_unsigned;
     
-    Token *name;
     Type *base;
+
+    // declaration
+    Token *name;
+    Token *name_pos;
 
     /* array */
     int array_len;

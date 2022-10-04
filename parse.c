@@ -274,6 +274,8 @@ static Node* funcall(void);
 static void parse_typedef(Type *base){
     do{
         Type *ty = declarator(base);
+        if(!ty -> name)
+            error_at(ty -> name_pos -> str, "typedef name omitted");
         push_scope(get_ident(ty -> name)) -> type_def = ty;
     }while(consume(","));
     expect(";");
@@ -294,6 +296,8 @@ static bool is_function(void){
 static void create_param_lvars(Type* param){
     if(param){
         create_param_lvars(param -> next);
+        if(!param -> name)
+            error_at(param -> name_pos -> str, "parameter name omitted");
         new_lvar(get_ident(param -> name), param);
     }
 }
@@ -315,6 +319,9 @@ static void resolve_goto_labels(void){
 // function = declarator ( ";" | "{" compound_stmt)
 static void function(Type *base, VarAttr *attr){
     Type *ty = declarator(base);
+
+    if(!ty -> name)
+        error_at(ty -> name_pos -> str, "function name omitted");
 
     Obj* func = new_gvar(get_ident(ty -> name), ty);
     func -> is_definition = !consume(";");
@@ -347,6 +354,8 @@ static void global_variable(Type *base, VarAttr *attr){
             expect(",");
         is_first = false;
         Type *ty = declarator(base);
+        if(!ty -> name)
+            error_at(ty -> name_pos -> str, "variable name omitted");
         Obj *var = new_gvar(get_ident(ty -> name), ty);
         var -> is_definition = !attr -> is_extern;
         var -> is_static = attr -> is_static;
@@ -1077,14 +1086,17 @@ static Type* declarator(Type *ty){
         return ty;
     }
 
-    if(token -> kind != TK_IDENT){
-        error_at(token -> str, "expected a variable name\n");
+    Token *name = NULL;
+    Token *name_pos = token;
+
+    if(token -> kind == TK_IDENT){
+        name = token;
+        token = token -> next;
     }
 
-    Token *name = token;
-    next_token();
     ty = type_suffix(ty);
     ty -> name = name;
+    ty -> name_pos = name_pos;
     return ty;
 }
 
@@ -1122,6 +1134,8 @@ static Node *declaration(Type *base, VarAttr *attr){
 
         if(is_void(ty))
             error_at(ty -> name -> str, "variable declared void");
+        if(!ty  -> name)
+            error_at(ty -> name_pos -> str, "variable name omitted");
 
         if(attr && attr -> is_static){
             Obj *var = new_anon_gvar(ty);
